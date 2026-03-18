@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout nasty-go
+        uses: actions/checkout@v6
+        with:
+          repository: nasty-project/nasty-go
+          path: ../nasty-go
+          token: ${{ secrets.NASTY_PAT }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          args: --config .golangci.yml
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout nasty-go
+        uses: actions/checkout@v6
+        with:
+          repository: nasty-project/nasty-go
+          path: ../nasty-go
+          token: ${{ secrets.NASTY_PAT }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Cross-compile check
+        run: |
+          GOOS=linux   GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty-csi
+          GOOS=darwin  GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty-csi
+          GOOS=darwin  GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty-csi
+          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty-csi

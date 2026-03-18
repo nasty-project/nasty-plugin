@@ -1,0 +1,263 @@
+# golangci-lint configuration
+# Documentation: https://golangci-lint.run/docs/configuration/file/
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+      print-issued-lines: true
+  sort-order:
+    - linter
+    - file
+
+linters:
+  default: none
+  enable:
+    # Enabled by default linters
+    - errcheck        # Checks for unchecked errors
+    - govet           # Reports suspicious constructs
+    - ineffassign     # Detects ineffectual assignments
+    - staticcheck     # Go static analysis
+    - unused          # Checks for unused constants, variables, functions and types
+    
+    # Code quality
+    - revive          # Fast, configurable, extensible, flexible, and beautiful linter
+    - misspell        # Finds commonly misspelled English words
+    - unconvert       # Remove unnecessary type conversions
+    - unparam         # Reports unused function parameters
+    - gosec           # Security problems
+    - bodyclose       # Checks whether HTTP response body is closed
+    - noctx           # Finds sending http request without context.Context
+    - gocyclo         # Computes cyclomatic complexity
+    - dupl            # Code clone detection
+    - goconst         # Finds repeated strings that could be constants
+    - gocognit        # Computes cognitive complexity
+    - gocritic        # Provides diagnostics that check for bugs, performance and style issues
+    - godot           # Checks if comments end in a period
+    - prealloc        # Finds slice declarations that could be preallocated
+    - predeclared     # Finds code that shadows predeclared identifiers
+    - whitespace      # Checks for unnecessary whitespace
+    - errorlint       # Find misuses of errors
+    - forcetypeassert # Finds forced type assertions
+    - gomoddirectives # Manage use of replace, retract directives in go.mod
+    - nilnil          # Checks returning nil even if nil is a valid value
+    - nolintlint      # Ill-formed or insufficient nolint directives
+    - usestdlibvars   # Suggests using constants from stdlib
+    
+    # Additional security & bug detection
+    - asciicheck      # Checks for non-ASCII identifiers
+    - bidichk         # Checks for dangerous unicode sequences
+    - durationcheck   # Checks for two durations multiplied together
+    - err113          # Checks error handling expressions (Go 1.13+)
+    - errname         # Checks error naming conventions (Err prefix, Error suffix)
+    - exhaustive      # Checks exhaustiveness of enum switch statements
+    - makezero        # Finds slice declarations with non-zero initial length
+    - nilerr          # Finds code that returns nil even if it checks error is not nil
+    - nilnesserr      # Reports returning nil with a different nil value error
+    - nosprintfhostport # Checks for Sprintf misuse in URL construction
+    - rowserrcheck    # Checks that sql.Rows.Err is checked
+    - sqlclosecheck   # Checks that sql rows/statements are closed
+    - wastedassign    # Finds wasted assignment statements
+    
+    # Performance
+    - perfsprint      # Checks that fmt.Sprintf can be replaced with faster alternatives
+    - mirror          # Reports wrong mirror patterns of bytes/strings usage
+    
+    # Error handling improvements
+    # wrapcheck disabled: CSI drivers intentionally don't wrap gRPC status.Error() calls
+    # as they are spec-compliant status responses, not errors to be wrapped
+    # - wrapcheck       # Checks that errors from external packages are wrapped
+    
+    # Maintainability & readability
+    - contextcheck    # Checks whether functions use non-inherited context
+    - copyloopvar     # Detects places where loop variables are copied
+    - dogsled         # Checks for too many blank identifiers
+    - dupword         # Checks for duplicate words in source code
+    - errchkjson      # Checks types passed to json encoding functions
+    - gocheckcompilerdirectives # Validates go compiler directives
+    - godox           # Detects FIXME, TODO and other comment keywords
+    - grouper         # Analyzes expression groups
+    - importas        # Enforces consistent import aliases
+    - interfacebloat  # Checks the number of methods in an interface
+    - intrange        # Suggests using integer range in for loops (Go 1.22+)
+    - loggercheck     # Checks key-value pairs for common logger libraries (klog)
+    - nakedret        # Checks for naked returns in long functions
+    - nestif          # Reports deeply nested if statements
+    - reassign        # Checks that package variables are not reassigned
+    - recvcheck       # Checks for receiver type consistency
+    - sloglint        # Ensures consistent code style with log/slog
+    - tagalign        # Checks struct tags are well aligned
+    - thelper         # Detects test helpers not starting with t.Helper()
+    - tparallel       # Detects inappropriate usage of t.Parallel()
+    - testifylint     # Checks usage of testify
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (*github.com/gorilla/websocket.Conn).Close
+        - (io.Closer).Close
+      
+    govet:
+      enable-all: true
+      
+    gocyclo:
+      min-complexity: 26
+      
+    gocognit:
+      min-complexity: 45
+      
+    dupl:
+      threshold: 100
+      
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+      
+    misspell:
+      locale: US
+      
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+          disabled: false
+        - name: var-naming
+          severity: warning
+          disabled: false
+          arguments:
+            - []
+            - []
+            - - skipPackageNameCollisionWithGoStd: true
+        - name: package-comments
+          severity: warning
+          disabled: false
+        - name: error-return
+          severity: warning
+          disabled: false
+        - name: error-strings
+          severity: warning
+          disabled: false
+        - name: error-naming
+          severity: warning
+          disabled: false
+        - name: increment-decrement
+          severity: warning
+          disabled: false
+        - name: var-declaration
+          severity: warning
+          disabled: false
+        - name: range
+          severity: warning
+          disabled: false
+        - name: receiver-naming
+          severity: warning
+          disabled: false
+        - name: indent-error-flow
+          severity: warning
+          disabled: false
+        - name: superfluous-else
+          severity: warning
+          disabled: false
+        - name: unused-parameter
+          severity: warning
+          disabled: true  # Can be noisy
+          
+    gosec:
+      excludes:
+        - G404  # Use of weak random number generator (we don't use for crypto)
+        - G204  # Subprocess launched with variable - expected for CSI driver (nvme, mount, blkid, etc.)
+        - G117  # Exported struct field matches secret pattern - APIKey is a config field, not a secret in code
+        - G703  # Path traversal via taint analysis - false positive on socket file removal
+        - G118  # Goroutine uses context.Background - expected for signal handlers and background tasks
+      
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+        - opinionated
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
+        
+    whitespace:
+      multi-if: true
+      multi-func: true
+      
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    nakedret:
+      max-func-lines: 30
+      
+    nestif:
+      min-complexity: 21
+      
+    loggercheck:
+      require-string-key: true
+      
+    tagalign:
+      align: true
+      sort: true
+      
+    interfacebloat:
+      max: 10
+      
+    godox:
+      keywords:
+        - BUG
+        - FIXME
+        - HACK
+
+  exclusions:
+    generated: lax
+    rules:
+      # Exclude some linters from running on tests files
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - gocognit
+          - errcheck
+          - dupl
+          - gosec
+          - goconst
+          - wrapcheck
+          - err113
+          - nestif
+          - interfacebloat
+          - funlen
+          - maintidx
+          
+      # Ignore long lines in generated files
+      - path: \.pb\.go$
+        linters:
+          - revive
+          - lll
+          
+      # Allow fmt.Sprintf in certain cases
+      - text: "printf-like formatting function"
+        linters:
+          - revive
+          
+      # Known TODO items are tracked, not immediate problems
+      - text: "Line contains TODO/BUG/FIXME"
+        linters:
+          - godox
+
+formatters:
+  enable:
+    - goimports       # Checks import statements are formatted
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  fix: false
