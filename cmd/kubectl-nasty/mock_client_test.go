@@ -17,16 +17,16 @@ type mockClient struct {
 	QueryFilesystemFunc func(ctx context.Context, fsName string) (*nastyapi.Filesystem, error)
 
 	// Subvolume operations
-	CreateSubvolumeFunc          func(ctx context.Context, params nastyapi.SubvolumeCreateParams) (*nastyapi.Subvolume, error)
-	DeleteSubvolumeFunc          func(ctx context.Context, filesystem, name string) error
-	GetSubvolumeFunc             func(ctx context.Context, filesystem, name string) (*nastyapi.Subvolume, error)
-	ListAllSubvolumesFunc        func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
-	ResizeSubvolumeFunc          func(ctx context.Context, filesystem, name string, volsizeBytes uint64) (*nastyapi.Subvolume, error)
-	CloneSubvolumeFunc           func(ctx context.Context, filesystem, name, newName string) (*nastyapi.Subvolume, error)
-	SetSubvolumePropertiesFunc   func(ctx context.Context, filesystem, name string, props map[string]string) (*nastyapi.Subvolume, error)
-	RemoveSubvolumePropertiesFunc func(ctx context.Context, filesystem, name string, keys []string) (*nastyapi.Subvolume, error)
-	FindSubvolumesByPropertyFunc func(ctx context.Context, key, value, filesystem string) ([]nastyapi.Subvolume, error)
-	FindManagedSubvolumesFunc    func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
+	CreateSubvolumeFunc              func(ctx context.Context, params nastyapi.SubvolumeCreateParams) (*nastyapi.Subvolume, error)
+	DeleteSubvolumeFunc              func(ctx context.Context, filesystem, name string) error
+	GetSubvolumeFunc                 func(ctx context.Context, filesystem, name string) (*nastyapi.Subvolume, error)
+	ListAllSubvolumesFunc            func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
+	ResizeSubvolumeFunc              func(ctx context.Context, filesystem, name string, volsizeBytes uint64) (*nastyapi.Subvolume, error)
+	CloneSubvolumeFunc               func(ctx context.Context, filesystem, name, newName string) (*nastyapi.Subvolume, error)
+	SetSubvolumePropertiesFunc       func(ctx context.Context, filesystem, name string, props map[string]string) (*nastyapi.Subvolume, error)
+	RemoveSubvolumePropertiesFunc    func(ctx context.Context, filesystem, name string, keys []string) (*nastyapi.Subvolume, error)
+	FindSubvolumesByPropertyFunc     func(ctx context.Context, key, value, filesystem string) ([]nastyapi.Subvolume, error)
+	FindManagedSubvolumesFunc        func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
 	FindSubvolumeByCSIVolumeNameFunc func(ctx context.Context, filesystem, volumeName string) (*nastyapi.Subvolume, error)
 
 	// Snapshot operations
@@ -48,12 +48,12 @@ type mockClient struct {
 	GetSMBShareFunc    func(ctx context.Context, id string) (*nastyapi.SMBShare, error)
 
 	// iSCSI operations
-	CreateISCSITargetFunc    func(ctx context.Context, params nastyapi.ISCSITargetCreateParams) (*nastyapi.ISCSITarget, error)
-	AddISCSILunFunc          func(ctx context.Context, targetID, backstorePath string) (*nastyapi.ISCSITarget, error)
-	AddISCSIACLFunc          func(ctx context.Context, targetID, initiatorIQN string) (*nastyapi.ISCSITarget, error)
-	DeleteISCSITargetFunc    func(ctx context.Context, id string) error
-	ListISCSITargetsFunc     func(ctx context.Context) ([]nastyapi.ISCSITarget, error)
-	GetISCSITargetByIQNFunc  func(ctx context.Context, iqn string) (*nastyapi.ISCSITarget, error)
+	CreateISCSITargetFunc   func(ctx context.Context, params nastyapi.ISCSITargetCreateParams) (*nastyapi.ISCSITarget, error)
+	AddISCSILunFunc         func(ctx context.Context, targetID, backstorePath string) (*nastyapi.ISCSITarget, error)
+	AddISCSIACLFunc         func(ctx context.Context, targetID, initiatorIQN string) (*nastyapi.ISCSITarget, error)
+	DeleteISCSITargetFunc   func(ctx context.Context, id string) error
+	ListISCSITargetsFunc    func(ctx context.Context) ([]nastyapi.ISCSITarget, error)
+	GetISCSITargetByIQNFunc func(ctx context.Context, iqn string) (*nastyapi.ISCSITarget, error)
 
 	// NVMe-oF operations
 	CreateNVMeOFSubsystemFunc   func(ctx context.Context, params nastyapi.NVMeOFCreateParams) (*nastyapi.NVMeOFSubsystem, error)

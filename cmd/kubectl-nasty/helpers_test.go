@@ -120,7 +120,7 @@ func TestExtractConfigFromSecretData(t *testing.T) {
 			name: "alternative key names",
 			data: map[string][]byte{
 				"nasty-url": []byte("wss://alt-host:443/api/current"),
-				"apiKey":      []byte("alt-key"),
+				"apiKey":    []byte("alt-key"),
 			},
 			wantNil:    false,
 			wantURL:    "wss://alt-host:443/api/current",

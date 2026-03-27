@@ -13,8 +13,8 @@ import (
 
 // Static errors for adopt command.
 var (
-	errDatasetNotFound    = errors.New("dataset not found")
-	errNoUserProperties   = errors.New("no user properties found")
+	errDatasetNotFound      = errors.New("dataset not found")
+	errNoUserProperties     = errors.New("no user properties found")
 	errNotManagedByNastyCSI = errors.New("not managed by nasty-csi")
 )
 
@@ -218,60 +218,73 @@ func extractVolumeInfo(ctx context.Context, client nastyapi.ClientInterface, ds 
 	}
 
 	// Discover protocol-specific resources dynamically
+	discoverProtocolResources(ctx, client, ds, info)
+
+	return info, nil
+}
+
+// discoverProtocolResources populates protocol-specific fields by querying the NASty API.
+func discoverProtocolResources(ctx context.Context, client nastyapi.ClientInterface, ds *nastyapi.Subvolume, info *adoptionVolumeInfo) {
 	switch info.protocol {
 	case nastyapi.ProtocolNFS:
-		// Match NFS share by subvolume path
-		if ds.Path != "" {
-			if shares, err := client.ListNFSShares(ctx); err == nil {
-				for i := range shares {
-					if shares[i].Path == ds.Path {
-						info.nfsSharePath = shares[i].Path
-						break
-					}
-				}
+		if ds.Path == "" {
+			return
+		}
+		shares, err := client.ListNFSShares(ctx)
+		if err != nil {
+			return
+		}
+		for i := range shares {
+			if shares[i].Path == ds.Path {
+				info.nfsSharePath = shares[i].Path
+				return
 			}
 		}
 	case nastyapi.ProtocolNVMeOF:
-		// Match NVMe-oF subsystem by NQN suffix
-		if info.volumeID != "" {
-			suffix := ":" + info.volumeID
-			if subsystems, err := client.ListNVMeOFSubsystems(ctx); err == nil {
-				for i := range subsystems {
-					if strings.HasSuffix(subsystems[i].NQN, suffix) {
-						info.nvmeNQN = subsystems[i].NQN
-						break
-					}
-				}
+		if info.volumeID == "" {
+			return
+		}
+		suffix := ":" + info.volumeID
+		subsystems, err := client.ListNVMeOFSubsystems(ctx)
+		if err != nil {
+			return
+		}
+		for i := range subsystems {
+			if strings.HasSuffix(subsystems[i].NQN, suffix) {
+				info.nvmeNQN = subsystems[i].NQN
+				return
 			}
 		}
 	case nastyapi.ProtocolISCSI:
-		// Match iSCSI target by IQN suffix
-		if info.volumeID != "" {
-			suffix := ":" + info.volumeID
-			if targets, err := client.ListISCSITargets(ctx); err == nil {
-				for i := range targets {
-					if strings.HasSuffix(targets[i].IQN, suffix) {
-						info.iscsiIQN = targets[i].IQN
-						break
-					}
-				}
+		if info.volumeID == "" {
+			return
+		}
+		suffix := ":" + info.volumeID
+		targets, err := client.ListISCSITargets(ctx)
+		if err != nil {
+			return
+		}
+		for i := range targets {
+			if strings.HasSuffix(targets[i].IQN, suffix) {
+				info.iscsiIQN = targets[i].IQN
+				return
 			}
 		}
 	case nastyapi.ProtocolSMB:
-		// Match SMB share by subvolume path
-		if ds.Path != "" {
-			if shares, err := client.ListSMBShares(ctx); err == nil {
-				for i := range shares {
-					if shares[i].Path == ds.Path {
-						info.smbShareName = shares[i].Name
-						break
-					}
-				}
+		if ds.Path == "" {
+			return
+		}
+		shares, err := client.ListSMBShares(ctx)
+		if err != nil {
+			return
+		}
+		for i := range shares {
+			if shares[i].Path == ds.Path {
+				info.smbShareName = shares[i].Name
+				return
 			}
 		}
 	}
-
-	return info, nil
 }
 
 func generateAdoptionManifests(info *adoptionVolumeInfo, nastyURL string) (string, error) {
@@ -376,7 +389,7 @@ func generatePV(info *adoptionVolumeInfo, server string) map[string]interface{} 
 			"name": pvName,
 			"labels": map[string]string{
 				"app.kubernetes.io/managed-by": "kubectl-nasty",
-				"nasty-csi.io/adopted":           "true",
+				"nasty-csi.io/adopted":         "true",
 			},
 			"annotations": map[string]string{
 				"nasty-csi.io/dataset": info.dataset,
@@ -411,7 +424,7 @@ func generatePVC(info *adoptionVolumeInfo) map[string]interface{} {
 			"namespace": info.namespace,
 			"labels": map[string]string{
 				"app.kubernetes.io/managed-by": "kubectl-nasty",
-				"nasty-csi.io/adopted":           "true",
+				"nasty-csi.io/adopted":         "true",
 			},
 			"annotations": map[string]string{
 				"nasty-csi.io/dataset": info.dataset,

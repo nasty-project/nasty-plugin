@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"

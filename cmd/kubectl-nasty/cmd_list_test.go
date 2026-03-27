@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
+	"github.com/nasty-project/nasty-go/dashboard"
 )
 
 func TestFindManagedVolumes(t *testing.T) {

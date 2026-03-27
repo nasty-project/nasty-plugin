@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
+	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 )

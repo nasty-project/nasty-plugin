@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
+	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

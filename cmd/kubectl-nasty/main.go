@@ -34,8 +34,8 @@ func main() {
 
 func newRootCmd() *cobra.Command {
 	var (
-		nastyURL    string
-		nastyAPIKey string
+		nastyURL      string
+		nastyAPIKey   string
 		secretRef     string
 		outputFormat  string
 		skipTLSVerify bool

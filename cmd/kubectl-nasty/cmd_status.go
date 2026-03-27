@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
+	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -161,15 +161,16 @@ func checkNFSStatus(ctx context.Context, client nastyapi.ClientInterface, sv *na
 	}
 
 	for _, share := range shares {
-		if share.Path == sv.Path {
-			status.NFSShareID = share.ID
-			status.NFSSharePath = share.Path
-			status.NFSEnabled = share.Enabled
-			if !share.Enabled {
-				return fmt.Errorf("%w: %s", errNFSShareDisabled, share.ID)
-			}
-			return nil
+		if share.Path != sv.Path {
+			continue
 		}
+		status.NFSShareID = share.ID
+		status.NFSSharePath = share.Path
+		status.NFSEnabled = share.Enabled
+		if !share.Enabled {
+			return fmt.Errorf("%w: %s", errNFSShareDisabled, share.ID)
+		}
+		return nil
 	}
 
 	return fmt.Errorf("%w for path %s", errNFSShareNotFound, sv.Path)
