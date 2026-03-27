@@ -19,12 +19,10 @@ func TestCheckNFSHealth(t *testing.T) {
 		{
 			name: "share found and enabled",
 			sv: &nastyapi.Subvolume{
-				Name: "csi/pvc-1",
-				Pool: "tank",
-				Path: "/tank/csi/pvc-1",
-				Properties: map[string]string{
-					nastyapi.PropertyNFSSharePath: "/mnt/tank/csi/pvc-1",
-				},
+				Name:       "csi/pvc-1",
+				Filesystem: "tank",
+				Path:       "/mnt/tank/csi/pvc-1",
+				Properties: map[string]string{},
 			},
 			nfsShareMap: map[string]*nastyapi.NFSShare{
 				"/mnt/tank/csi/pvc-1": {Path: "/mnt/tank/csi/pvc-1", Enabled: true, ID: "1"},
@@ -35,12 +33,10 @@ func TestCheckNFSHealth(t *testing.T) {
 		{
 			name: "share found but disabled",
 			sv: &nastyapi.Subvolume{
-				Name: "csi/pvc-2",
-				Pool: "tank",
-				Path: "/tank/csi/pvc-2",
-				Properties: map[string]string{
-					nastyapi.PropertyNFSSharePath: "/mnt/tank/csi/pvc-2",
-				},
+				Name:       "csi/pvc-2",
+				Filesystem: "tank",
+				Path:       "/mnt/tank/csi/pvc-2",
+				Properties: map[string]string{},
 			},
 			nfsShareMap: map[string]*nastyapi.NFSShare{
 				"/mnt/tank/csi/pvc-2": {Path: "/mnt/tank/csi/pvc-2", Enabled: false, ID: "2"},
@@ -51,26 +47,22 @@ func TestCheckNFSHealth(t *testing.T) {
 		{
 			name: "share not found",
 			sv: &nastyapi.Subvolume{
-				Name: "csi/pvc-3",
-				Pool: "tank",
-				Path: "/tank/csi/pvc-3",
-				Properties: map[string]string{
-					nastyapi.PropertyNFSSharePath: "/mnt/tank/csi/pvc-3",
-				},
+				Name:       "csi/pvc-3",
+				Filesystem: "tank",
+				Path:       "/mnt/tank/csi/pvc-3",
+				Properties: map[string]string{},
 			},
 			nfsShareMap: map[string]*nastyapi.NFSShare{},
 			wantShareOK: boolPtr(false),
 			wantIssues:  1,
 		},
 		{
-			name: "share path not in properties",
+			name: "empty path",
 			sv: &nastyapi.Subvolume{
 				Name:       "csi/pvc-4",
-				Pool:       "tank",
+				Filesystem: "tank",
 				Path:       "",
-				Properties: map[string]string{
-					// No PropertyNFSSharePath set
-				},
+				Properties: map[string]string{},
 			},
 			nfsShareMap: map[string]*nastyapi.NFSShare{},
 			wantShareOK: boolPtr(false),
@@ -109,12 +101,12 @@ func TestCheckNVMeOFHealth(t *testing.T) {
 		wantIssues    int
 	}{
 		{
-			name: "subsystem found",
+			name: "subsystem found by NQN suffix",
 			sv: &nastyapi.Subvolume{
-				Name: "zvols/pvc-1",
-				Pool: "tank",
+				Name:       "zvols/pvc-1",
+				Filesystem: "tank",
 				Properties: map[string]string{
-					nastyapi.PropertyNVMeSubsystemNQN: "nqn.2024.io.nasty:nvme:pvc-1",
+					nastyapi.PropertyCSIVolumeName: "pvc-1",
 				},
 			},
 			nvmeSubsysMap: map[string]*nastyapi.NVMeOFSubsystem{
@@ -126,10 +118,10 @@ func TestCheckNVMeOFHealth(t *testing.T) {
 		{
 			name: "subsystem not found",
 			sv: &nastyapi.Subvolume{
-				Name: "zvols/pvc-2",
-				Pool: "tank",
+				Name:       "zvols/pvc-2",
+				Filesystem: "tank",
 				Properties: map[string]string{
-					nastyapi.PropertyNVMeSubsystemNQN: "nqn.2024.io.nasty:nvme:pvc-2",
+					nastyapi.PropertyCSIVolumeName: "pvc-2",
 				},
 			},
 			nvmeSubsysMap: map[string]*nastyapi.NVMeOFSubsystem{},
@@ -137,13 +129,11 @@ func TestCheckNVMeOFHealth(t *testing.T) {
 			wantIssues:    1,
 		},
 		{
-			name: "NQN not in properties",
+			name: "no CSI volume name",
 			sv: &nastyapi.Subvolume{
 				Name:       "zvols/pvc-3",
-				Pool:       "tank",
-				Properties: map[string]string{
-					// No PropertyNVMeSubsystemNQN set
-				},
+				Filesystem: "tank",
+				Properties: map[string]string{},
 			},
 			nvmeSubsysMap: map[string]*nastyapi.NVMeOFSubsystem{},
 			wantSubsysOK:  boolPtr(false),
@@ -216,38 +206,35 @@ func TestCheckVolumeHealth(t *testing.T) {
 				m.FindSubvolumesByPropertyFunc = func(_ context.Context, _, _, _ string) ([]nastyapi.Subvolume, error) {
 					return []nastyapi.Subvolume{
 						{
-							// Healthy NFS volume
-							Name: "csi/pvc-healthy",
-							Pool: "tank",
-							Path: "/mnt/tank/csi/pvc-healthy",
+							// Healthy NFS volume — share found by path
+							Name:       "csi/pvc-healthy",
+							Filesystem: "tank",
+							Path:       "/mnt/tank/csi/pvc-healthy",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy:     nastyapi.ManagedByValue,
 								nastyapi.PropertyCSIVolumeName: "pvc-healthy",
 								nastyapi.PropertyProtocol:      "nfs",
-								nastyapi.PropertyNFSSharePath:  "/mnt/tank/csi/pvc-healthy",
 							},
 						},
 						{
-							// Unhealthy NFS volume (share missing)
-							Name: "csi/pvc-unhealthy",
-							Pool: "tank",
-							Path: "/mnt/tank/csi/pvc-unhealthy",
+							// Unhealthy NFS volume — no matching share
+							Name:       "csi/pvc-unhealthy",
+							Filesystem: "tank",
+							Path:       "/mnt/tank/csi/pvc-unhealthy",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy:     nastyapi.ManagedByValue,
 								nastyapi.PropertyCSIVolumeName: "pvc-unhealthy",
 								nastyapi.PropertyProtocol:      "nfs",
-								nastyapi.PropertyNFSSharePath:  "/mnt/tank/csi/pvc-unhealthy",
 							},
 						},
 						{
-							// Healthy NVMe-oF volume
-							Name: "zvols/pvc-nvme",
-							Pool: "tank",
+							// Healthy NVMe-oF volume — subsystem found by NQN suffix
+							Name:       "zvols/pvc-nvme",
+							Filesystem: "tank",
 							Properties: map[string]string{
-								nastyapi.PropertyManagedBy:        nastyapi.ManagedByValue,
-								nastyapi.PropertyCSIVolumeName:    "pvc-nvme",
-								nastyapi.PropertyProtocol:         "nvmeof",
-								nastyapi.PropertyNVMeSubsystemNQN: "nqn.2024.io.nasty:nvme:pvc-nvme",
+								nastyapi.PropertyManagedBy:     nastyapi.ManagedByValue,
+								nastyapi.PropertyCSIVolumeName: "pvc-nvme",
+								nastyapi.PropertyProtocol:      "nvmeof",
 							},
 						},
 					}, nil

@@ -71,23 +71,23 @@ The command will:
   3. Add nasty-csi management properties
   4. Prepare the volume for adoption into Kubernetes
 
-After importing, use 'kubectl nasty-csi adopt <dataset>' to generate PV/PVC manifests.
+After importing, use 'kubectl nasty adopt <dataset>' to generate PV/PVC manifests.
 
 Examples:
   # Import an NFS dataset (auto-detect existing share)
-  kubectl nasty-csi import storage/k8s/pvc-xxx --protocol nfs
+  kubectl nasty import storage/k8s/pvc-xxx --protocol nfs
 
   # Import and create NFS share if missing
-  kubectl nasty-csi import storage/data/myvolume --protocol nfs --create-share
+  kubectl nasty import storage/data/myvolume --protocol nfs --create-share
 
   # Import with custom volume ID
-  kubectl nasty-csi import storage/k8s/pvc-xxx --protocol nfs --volume-id my-volume
+  kubectl nasty import storage/k8s/pvc-xxx --protocol nfs --volume-id my-volume
 
   # Dry run to see what would happen
-  kubectl nasty-csi import storage/k8s/pvc-xxx --protocol nfs --dry-run
+  kubectl nasty import storage/k8s/pvc-xxx --protocol nfs --dry-run
 
   # Import a zvol for NVMe-oF (future support)
-  kubectl nasty-csi import storage/zvols/myvol --protocol nvmeof`,
+  kubectl nasty import storage/zvols/myvol --protocol nvmeof`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			datasetPath := args[0]
@@ -186,14 +186,12 @@ func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string
 			return fmt.Errorf("NFS setup failed: %w", nfsErr)
 		}
 		for k, v := range nfsProps {
-			if k == "_nfs_share_id" {
+			switch k {
+			case "_nfs_share_id":
 				result.NFSShareID = v
-			} else {
-				props[k] = v
+			case "_nfs_share_path":
+				result.NFSSharePath = v
 			}
-		}
-		if sharePath, ok := nfsProps[nastyapi.PropertyNFSSharePath]; ok {
-			result.NFSSharePath = sharePath
 		}
 
 	case protocolNVMeOF:
@@ -210,12 +208,9 @@ func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string
 			switch k {
 			case "_iscsi_target_id":
 				result.ISCSITargetID = v
-			default:
-				props[k] = v
+			case "_iscsi_iqn":
+				result.ISCSIIQN = v
 			}
-		}
-		if iqn, ok := iscsiProps[nastyapi.PropertyISCSIIQN]; ok {
-			result.ISCSIIQN = iqn
 		}
 
 	case protocolSMB:
@@ -224,14 +219,12 @@ func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string
 			return fmt.Errorf("SMB setup failed: %w", smbErr)
 		}
 		for k, v := range smbProps {
-			if k == "_smb_share_id" {
+			switch k {
+			case "_smb_share_id":
 				result.SMBShareID = v
-			} else {
-				props[k] = v
+			case "_smb_share_name":
+				result.SMBShareName = v
 			}
-		}
-		if name, ok := smbProps[nastyapi.PropertySMBShareName]; ok {
-			result.SMBShareName = name
 		}
 	}
 
@@ -265,7 +258,7 @@ func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string
 	// Print next steps for table format
 	if *outputFormat == "" || *outputFormat == outputFormatTable {
 		fmt.Println("\nNext steps:")
-		fmt.Printf("  kubectl nasty-csi adopt %s --pvc-name <name> --namespace <ns>\n", datasetPath)
+		fmt.Printf("  kubectl nasty adopt %s --pvc-name <name> --namespace <ns>\n", datasetPath)
 	}
 
 	return nil
@@ -277,26 +270,6 @@ func handleISCSIImport(ctx context.Context, client nastyapi.ClientInterface, sv 
 	// iSCSI volumes are block devices
 	if sv.SubvolumeType != "block" {
 		return nil, fmt.Errorf("%w: subvolume type is %s", errISCSIRequiresZvol, sv.SubvolumeType)
-	}
-
-	// Check if IQN is already stored in properties
-	if sv.Properties != nil {
-		if storedIQN, ok := sv.Properties[nastyapi.PropertyISCSIIQN]; ok && storedIQN != "" {
-			// Look up target by IQN
-			target, err := client.GetISCSITargetByIQN(ctx, storedIQN)
-			if err == nil && target != nil {
-				if dryRun {
-					fmt.Printf("DRY RUN - Found iSCSI target by stored IQN:\n")
-					fmt.Printf("  Target ID: %s, IQN: %s\n", target.ID, target.IQN)
-					return props, nil
-				}
-				props[nastyapi.PropertyISCSIIQN] = target.IQN
-				props[nastyapi.PropertyISCSITargetID] = target.ID
-				props["_iscsi_target_id"] = target.ID
-				fmt.Printf("Found iSCSI target by IQN: %s (ID: %s)\n", target.IQN, target.ID)
-				return props, nil
-			}
-		}
 	}
 
 	// Scan all targets for one whose LUN backstore path matches the block device
@@ -334,9 +307,8 @@ func handleISCSIImport(ctx context.Context, client nastyapi.ClientInterface, sv 
 		return props, nil
 	}
 
-	props[nastyapi.PropertyISCSIIQN] = matchedTarget.IQN
-	props[nastyapi.PropertyISCSITargetID] = matchedTarget.ID
 	props["_iscsi_target_id"] = matchedTarget.ID
+	props["_iscsi_iqn"] = matchedTarget.IQN
 
 	fmt.Printf("Found iSCSI target: %s (IQN: %s)\n", matchedTarget.ID, matchedTarget.IQN)
 	return props, nil
@@ -368,9 +340,8 @@ func handleSMBImport(ctx context.Context, client nastyapi.ClientInterface, sv *n
 		return props, nil
 	}
 
-	props[nastyapi.PropertySMBShareName] = matchedShare.Name
-	props[nastyapi.PropertySMBShareID] = matchedShare.ID
 	props["_smb_share_id"] = matchedShare.ID
+	props["_smb_share_name"] = matchedShare.Name
 
 	fmt.Printf("Found SMB share: %s (ID: %s)\n", matchedShare.Name, matchedShare.ID)
 	return props, nil
@@ -395,9 +366,8 @@ func handleNFSImport(ctx context.Context, client nastyapi.ClientInterface, sv *n
 
 	if existingShare != nil {
 		// Use existing share
-		props[nastyapi.PropertyNFSSharePath] = existingShare.Path
-		props[nastyapi.PropertyNFSShareID] = existingShare.ID
 		props["_nfs_share_id"] = existingShare.ID
+		props["_nfs_share_path"] = existingShare.Path
 		fmt.Printf("Found existing NFS share: %s (ID: %s)\n", existingShare.Path, existingShare.ID)
 		return props, nil
 	}
@@ -409,7 +379,7 @@ func handleNFSImport(ctx context.Context, client nastyapi.ClientInterface, sv *n
 
 	if dryRun {
 		fmt.Printf("DRY RUN - Would create NFS share for path: %s\n", sv.Path)
-		props[nastyapi.PropertyNFSSharePath] = sv.Path
+		props["_nfs_share_path"] = sv.Path
 		return props, nil
 	}
 
@@ -417,7 +387,7 @@ func handleNFSImport(ctx context.Context, client nastyapi.ClientInterface, sv *n
 	enabled := true
 	shareParams := nastyapi.NFSShareCreateParams{
 		Path:    sv.Path,
-		Comment: "nasty-csi imported volume: " + sv.Pool + "/" + sv.Name,
+		Comment: "nasty-csi imported volume: " + sv.Filesystem + "/" + sv.Name,
 		Enabled: &enabled,
 	}
 
@@ -426,9 +396,8 @@ func handleNFSImport(ctx context.Context, client nastyapi.ClientInterface, sv *n
 		return nil, fmt.Errorf("failed to create NFS share: %w", err)
 	}
 
-	props[nastyapi.PropertyNFSSharePath] = sv.Path
-	props[nastyapi.PropertyNFSShareID] = share.ID
 	props["_nfs_share_id"] = share.ID
+	props["_nfs_share_path"] = sv.Path
 
 	fmt.Printf("Created NFS share: %s (ID: %s)\n", sv.Path, share.ID)
 	return props, nil

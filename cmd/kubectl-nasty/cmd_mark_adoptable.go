@@ -51,19 +51,19 @@ Use --unmark to remove the adoptable flag from volumes.
 
 Examples:
   # Mark a single volume as adoptable
-  kubectl nasty-csi mark-adoptable pvc-12345678-1234-1234-1234-123456789012
+  kubectl nasty mark-adoptable pvc-12345678-1234-1234-1234-123456789012
 
   # Mark multiple volumes as adoptable
-  kubectl nasty-csi mark-adoptable pvc-xxx pvc-yyy pvc-zzz
+  kubectl nasty mark-adoptable pvc-xxx pvc-yyy pvc-zzz
 
   # Mark all volumes as adoptable (for DR preparation)
-  kubectl nasty-csi mark-adoptable --all
+  kubectl nasty mark-adoptable --all
 
   # Remove adoptable flag from a volume
-  kubectl nasty-csi mark-adoptable --unmark pvc-xxx
+  kubectl nasty mark-adoptable --unmark pvc-xxx
 
   # Remove adoptable flag from all volumes
-  kubectl nasty-csi mark-adoptable --unmark --all`,
+  kubectl nasty mark-adoptable --unmark --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMarkAdoptable(cmd.Context(), args, url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID, unmark, all)
 		},
@@ -180,7 +180,7 @@ func findVolumeByRef(ctx context.Context, client nastyapi.ClientInterface, volum
 	}
 
 	for i := range subvols {
-		svID := subvols[i].Pool + "/" + subvols[i].Name
+		svID := subvols[i].Filesystem + "/" + subvols[i].Name
 		if svID == volumeRef {
 			return subvolumeToVolumeInfo(&subvols[i]), nil
 		}
@@ -192,7 +192,7 @@ func findVolumeByRef(ctx context.Context, client nastyapi.ClientInterface, volum
 // subvolumeToVolumeInfo converts a Subvolume to VolumeInfo.
 func subvolumeToVolumeInfo(sv *nastyapi.Subvolume) *VolumeInfo {
 	info := &VolumeInfo{
-		Dataset: sv.Pool + "/" + sv.Name,
+		Dataset: sv.Filesystem + "/" + sv.Name,
 	}
 
 	if sv.Properties != nil {

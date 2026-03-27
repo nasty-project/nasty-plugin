@@ -37,16 +37,16 @@ The command shows:
 
 Examples:
   # List unmanaged volumes in a specific pool
-  kubectl nasty-csi list-unmanaged --pool storage
+  kubectl nasty list-unmanaged --pool storage
 
   # List unmanaged volumes under a specific parent dataset
-  kubectl nasty-csi list-unmanaged --parent storage/k8s
+  kubectl nasty list-unmanaged --parent storage/k8s
 
   # Show all datasets including system datasets
-  kubectl nasty-csi list-unmanaged --pool storage --all
+  kubectl nasty list-unmanaged --pool storage --all
 
   # Output as JSON for scripting
-  kubectl nasty-csi list-unmanaged --pool storage -o json`,
+  kubectl nasty list-unmanaged --pool storage -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListUnmanaged(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID,
 				pool, parentPath, showAll)
@@ -128,7 +128,7 @@ func outputUnmanagedVolumes(volumes []UnmanagedVolume, format string) error {
 		renderTable(t)
 
 		fmt.Printf("\nFound %d unmanaged volume(s)\n", len(volumes))
-		fmt.Println("Use 'kubectl nasty-csi import <dataset>' to import a volume into nasty-csi management")
+		fmt.Println("Use 'kubectl nasty import <dataset>' to import a volume into nasty-csi management")
 		return nil
 
 	default:

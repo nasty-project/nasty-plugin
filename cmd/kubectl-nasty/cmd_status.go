@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
@@ -16,11 +17,9 @@ import (
 // Static errors for status command.
 var (
 	errVolumeNotFound        = errors.New("volume not found")
-	errNFSShareIDNotFound    = errors.New("NFS share ID not found in properties")
 	errNFSShareDisabled      = errors.New("NFS share is disabled")
 	errNFSShareNotFound      = errors.New("NFS share not found")
 	errNVMeSubsystemNotFound = errors.New("NVMe-oF subsystem not found")
-	errNVMeNamespaceNotFound = errors.New("NVMe-oF namespace not found")
 	errStatusUnknownFormat   = errors.New("unknown output format")
 )
 
@@ -58,10 +57,10 @@ func newStatusCmd(url, apiKey, secretRef, outputFormat *string, skipTLSVerify *b
 
 Examples:
   # Get status of a specific volume
-  kubectl nasty-csi status pvc-abc123
+  kubectl nasty status pvc-abc123
 
   # Output as JSON for scripting
-  kubectl nasty-csi status pvc-abc123 -o json`,
+  kubectl nasty status pvc-abc123 -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			volumeID := args[0]
@@ -110,7 +109,7 @@ func buildVolumeStatus(ctx context.Context, client nastyapi.ClientInterface, sv 
 
 	status := &VolumeStatus{
 		VolumeID: volumeID,
-		Dataset:  sv.Pool + "/" + sv.Name,
+		Dataset:  sv.Filesystem + "/" + sv.Name,
 		Type:     sv.SubvolumeType,
 		Healthy:  true,
 	}
@@ -150,29 +149,22 @@ func buildVolumeStatus(ctx context.Context, client nastyapi.ClientInterface, sv 
 	return status, nil
 }
 
-func checkNFSStatus(ctx context.Context, client nastyapi.ClientInterface, _ *nastyapi.Subvolume, props map[string]string, status *VolumeStatus) error {
-	// Get NFS share ID from properties
-	if props != nil {
-		status.NFSShareID = props[nastyapi.PropertyNFSShareID]
-		status.NFSSharePath = props[nastyapi.PropertyNFSSharePath]
+func checkNFSStatus(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume, _ map[string]string, status *VolumeStatus) error {
+	// Find NFS share by subvolume path
+	if sv.Path == "" {
+		return errNFSShareNotFound
 	}
 
-	if status.NFSShareID == "" {
-		return errNFSShareIDNotFound
-	}
-
-	// Query NFS shares to verify share exists and is enabled
 	shares, err := client.ListNFSShares(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to query NFS shares: %w", err)
 	}
 
 	for _, share := range shares {
-		if share.ID == status.NFSShareID {
+		if share.Path == sv.Path {
+			status.NFSShareID = share.ID
+			status.NFSSharePath = share.Path
 			status.NFSEnabled = share.Enabled
-			if status.NFSSharePath == "" {
-				status.NFSSharePath = share.Path
-			}
 			if !share.Enabled {
 				return fmt.Errorf("%w: %s", errNFSShareDisabled, share.ID)
 			}
@@ -180,55 +172,34 @@ func checkNFSStatus(ctx context.Context, client nastyapi.ClientInterface, _ *nas
 		}
 	}
 
-	return fmt.Errorf("%w: %s", errNFSShareNotFound, status.NFSShareID)
+	return fmt.Errorf("%w for path %s", errNFSShareNotFound, sv.Path)
 }
 
 func checkNVMeOFStatus(ctx context.Context, client nastyapi.ClientInterface, _ *nastyapi.Subvolume, props map[string]string, status *VolumeStatus) error {
-	// Get NVMe-oF IDs from properties
+	// Find NVMe-oF subsystem by NQN suffix matching volume name
+	volumeName := ""
 	if props != nil {
-		status.NVMeSubsystemID = props[nastyapi.PropertyNVMeSubsystemID]
-		status.NVMeNQN = props[nastyapi.PropertyNVMeSubsystemNQN]
+		volumeName = props[nastyapi.PropertyCSIVolumeName]
+	}
+	if volumeName == "" {
+		return errNVMeSubsystemNotFound
 	}
 
-	// Verify subsystem exists by NQN
-	if status.NVMeNQN != "" {
-		subsystem, err := client.GetNVMeOFSubsystemByNQN(ctx, status.NVMeNQN)
-		if err != nil {
-			return fmt.Errorf("failed to query NVMe-oF subsystem: %w", err)
-		}
-		if subsystem == nil {
-			return fmt.Errorf("%w: %s", errNVMeSubsystemNotFound, status.NVMeNQN)
-		}
-		if status.NVMeSubsystemID == "" {
-			status.NVMeSubsystemID = subsystem.ID
-		}
-	} else if status.NVMeSubsystemID != "" {
-		// Fallback: scan all subsystems for matching ID
-		subsystems, err := client.ListNVMeOFSubsystems(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to query NVMe-oF subsystems: %w", err)
-		}
+	suffix := ":" + volumeName
+	subsystems, err := client.ListNVMeOFSubsystems(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query NVMe-oF subsystems: %w", err)
+	}
 
-		found := false
-		for _, subsys := range subsystems {
-			if subsys.ID == status.NVMeSubsystemID {
-				found = true
-				if status.NVMeNQN == "" {
-					status.NVMeNQN = subsys.NQN
-				}
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("%w: %s", errNVMeSubsystemNotFound, status.NVMeSubsystemID)
+	for _, subsys := range subsystems {
+		if strings.HasSuffix(subsys.NQN, suffix) {
+			status.NVMeSubsystemID = subsys.ID
+			status.NVMeNQN = subsys.NQN
+			return nil
 		}
 	}
 
-	// errNVMeNamespaceNotFound is kept for error definitions but namespaces are now
-	// embedded in the subsystem — no separate namespace check needed.
-	_ = errNVMeNamespaceNotFound
-
-	return nil
+	return fmt.Errorf("%w for volume %s", errNVMeSubsystemNotFound, volumeName)
 }
 
 func outputStatus(status *VolumeStatus, format string) error {

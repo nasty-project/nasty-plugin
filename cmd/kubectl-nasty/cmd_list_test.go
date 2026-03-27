@@ -35,7 +35,7 @@ func TestFindManagedVolumes(t *testing.T) {
 					return []nastyapi.Subvolume{
 						{
 							Name:          "csi/pvc-111",
-							Pool:          "tank",
+							Filesystem:    "tank",
 							SubvolumeType: "filesystem",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy:      nastyapi.ManagedByValue,
@@ -48,7 +48,7 @@ func TestFindManagedVolumes(t *testing.T) {
 						{
 							// Unmanaged / parent subvolume (no CSI volume name)
 							Name:          "csi",
-							Pool:          "tank",
+							Filesystem:    "tank",
 							SubvolumeType: "filesystem",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy: nastyapi.ManagedByValue,
@@ -70,51 +70,13 @@ func TestFindManagedVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "skip detached snapshots",
-			setupMock: func(m *mockClient) {
-				m.FindSubvolumesByPropertyFunc = func(_ context.Context, _, _, _ string) ([]nastyapi.Subvolume, error) {
-					return []nastyapi.Subvolume{
-						{
-							Name:          "csi/pvc-222",
-							Pool:          "tank",
-							SubvolumeType: "filesystem",
-							Properties: map[string]string{
-								nastyapi.PropertyManagedBy:        nastyapi.ManagedByValue,
-								nastyapi.PropertyCSIVolumeName:    "pvc-222",
-								nastyapi.PropertyProtocol:         "nfs",
-								nastyapi.PropertyDetachedSnapshot: "true",
-							},
-						},
-						{
-							Name:          "csi/pvc-333",
-							Pool:          "tank",
-							SubvolumeType: "filesystem",
-							Properties: map[string]string{
-								nastyapi.PropertyManagedBy:     nastyapi.ManagedByValue,
-								nastyapi.PropertyCSIVolumeName: "pvc-333",
-								nastyapi.PropertyProtocol:      "nfs",
-							},
-						},
-					}, nil
-				}
-			},
-			wantCount: 1,
-			wantErr:   false,
-			checkVols: func(t *testing.T, vols []VolumeInfo) {
-				t.Helper()
-				if vols[0].VolumeID != "pvc-333" {
-					t.Errorf("VolumeID = %q, want %q", vols[0].VolumeID, "pvc-333")
-				}
-			},
-		},
-		{
 			name: "skip subvolumes without volume ID",
 			setupMock: func(m *mockClient) {
 				m.FindSubvolumesByPropertyFunc = func(_ context.Context, _, _, _ string) ([]nastyapi.Subvolume, error) {
 					return []nastyapi.Subvolume{
 						{
 							Name:          "csi/parent",
-							Pool:          "tank",
+							Filesystem:    "tank",
 							SubvolumeType: "filesystem",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy: nastyapi.ManagedByValue,
@@ -123,7 +85,7 @@ func TestFindManagedVolumes(t *testing.T) {
 						},
 						{
 							Name:          "csi/pvc-444",
-							Pool:          "tank",
+							Filesystem:    "tank",
 							SubvolumeType: "filesystem",
 							Properties: map[string]string{
 								nastyapi.PropertyManagedBy:     nastyapi.ManagedByValue,
@@ -143,17 +105,15 @@ func TestFindManagedVolumes(t *testing.T) {
 					return []nastyapi.Subvolume{
 						{
 							Name:          "zvols/pvc-555",
-							Pool:          "tank",
+							Filesystem:    "tank",
 							SubvolumeType: "block",
 							Properties: map[string]string{
-								nastyapi.PropertyManagedBy:         nastyapi.ManagedByValue,
-								nastyapi.PropertyCSIVolumeName:     "pvc-555",
-								nastyapi.PropertyProtocol:          "nvmeof",
-								nastyapi.PropertyCapacityBytes:     "10737418240",
-								nastyapi.PropertyDeleteStrategy:    "retain",
-								nastyapi.PropertyAdoptable:         "true",
-								nastyapi.PropertyContentSourceType: "snapshot",
-								nastyapi.PropertyContentSourceID:   "snap-abc",
+								nastyapi.PropertyManagedBy:      nastyapi.ManagedByValue,
+								nastyapi.PropertyCSIVolumeName:  "pvc-555",
+								nastyapi.PropertyProtocol:       "nvmeof",
+								nastyapi.PropertyCapacityBytes:  "10737418240",
+								nastyapi.PropertyDeleteStrategy: "retain",
+								nastyapi.PropertyAdoptable:      "true",
 							},
 						},
 					}, nil
@@ -176,20 +136,11 @@ func TestFindManagedVolumes(t *testing.T) {
 				if v.CapacityBytes != 10737418240 {
 					t.Errorf("CapacityBytes = %d, want %d", v.CapacityBytes, 10737418240)
 				}
-				if v.CapacityHuman != "10.0Gi" {
-					t.Errorf("CapacityHuman = %q, want %q", v.CapacityHuman, "10.0Gi")
-				}
 				if v.DeleteStrategy != "retain" {
 					t.Errorf("DeleteStrategy = %q, want %q", v.DeleteStrategy, "retain")
 				}
 				if !v.Adoptable {
 					t.Error("Adoptable = false, want true")
-				}
-				if v.ContentSourceType != "snapshot" {
-					t.Errorf("ContentSourceType = %q, want %q", v.ContentSourceType, "snapshot")
-				}
-				if v.ContentSourceID != "snap-abc" {
-					t.Errorf("ContentSourceID = %q, want %q", v.ContentSourceID, "snap-abc")
 				}
 				if v.Type != "block" {
 					t.Errorf("Type = %q, want %q", v.Type, "block")

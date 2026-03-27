@@ -23,13 +23,13 @@ volumes, including both attached (on-volume) and detached snapshots.
 
 Examples:
   # List all snapshots in table format
-  kubectl nasty-csi list-snapshots
+  kubectl nasty list-snapshots
 
   # List all snapshots in YAML format
-  kubectl nasty-csi list-snapshots -o yaml
+  kubectl nasty list-snapshots -o yaml
 
   # List snapshots using specific NASty connection
-  kubectl nasty-csi list-snapshots --url wss://nasty:443/api/current --api-key <key>`,
+  kubectl nasty list-snapshots --url wss://nasty:443/api/current --api-key <key>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListSnapshots(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID)
 		},

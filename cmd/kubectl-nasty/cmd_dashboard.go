@@ -60,19 +60,19 @@ The dashboard provides:
 
 Examples:
   # Start dashboard and open in browser
-  kubectl nasty-csi dashboard
+  kubectl nasty dashboard
 
   # Start without opening browser
-  kubectl nasty-csi dashboard --open=false
+  kubectl nasty dashboard --open=false
 
   # Start on custom port
-  kubectl nasty-csi dashboard --port 9090
+  kubectl nasty dashboard --port 9090
 
   # With pool for unmanaged volume discovery
-  kubectl nasty-csi dashboard --pool storage
+  kubectl nasty dashboard --pool storage
 
   # With explicit credentials
-  kubectl nasty-csi dashboard --url wss://nasty:443/api/current --api-key KEY`,
+  kubectl nasty dashboard --url wss://nasty:443/api/current --api-key KEY`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDashboard(cmd.Context(), url, apiKey, secretRef, skipTLSVerify, clusterID, port, pool, openBrowser)
 		},

@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/nasty-project/nasty-go/dashboard"
-	nastyapi "github.com/nasty-project/nasty-go"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -29,10 +28,10 @@ Clone Modes:
 
 Examples:
   # List all clones in table format
-  kubectl nasty-csi list-clones
+  kubectl nasty list-clones
 
   # List all clones in YAML format
-  kubectl nasty-csi list-clones -o yaml`,
+  kubectl nasty list-clones -o yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListClones(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID)
 		},
@@ -87,11 +86,11 @@ func outputClones(clones []CloneInfo, format string) error {
 		for i := range clones {
 			var modeStr string
 			switch clones[i].CloneMode {
-			case nastyapi.CloneModeCOW:
+			case "cow":
 				modeStr = colorError.Sprint("cow")
-			case nastyapi.CloneModePromoted:
+			case "promoted":
 				modeStr = colorSuccess.Sprint("promoted")
-			case nastyapi.CloneModeDetached:
+			case "detached":
 				modeStr = colorProtocolNFS.Sprint("detached")
 			default:
 				modeStr = clones[i].CloneMode

@@ -65,19 +65,19 @@ Orphaned volumes are those that:
 
 Examples:
   # Preview what would be deleted (dry-run, default)
-  kubectl nasty-csi cleanup
+  kubectl nasty cleanup
 
   # Delete orphaned volumes (with confirmation)
-  kubectl nasty-csi cleanup --execute
+  kubectl nasty cleanup --execute
 
   # Delete orphaned volumes without confirmation
-  kubectl nasty-csi cleanup --execute --yes
+  kubectl nasty cleanup --execute --yes
 
   # Force delete volumes not marked as adoptable
-  kubectl nasty-csi cleanup --execute --force
+  kubectl nasty cleanup --execute --force
 
   # Output in JSON for scripting
-  kubectl nasty-csi cleanup -o json`,
+  kubectl nasty cleanup -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if execute {
 				dryRun = false
@@ -272,66 +272,97 @@ func deleteOrphanedVolume(ctx context.Context, client nastyapi.ClientInterface, 
 		return deleteISCSIVolumeResources(ctx, client, sv)
 	default:
 		// Unknown protocol - just try to delete the subvolume
-		pool, name := parsePoolName(sv.Pool + "/" + sv.Name)
+		pool, name := parsePoolName(sv.Filesystem + "/" + sv.Name)
 		return client.DeleteSubvolume(ctx, pool, name)
 	}
 }
 
 // deleteNFSVolumeResources deletes NFS share and subvolume.
 func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Get NFS share ID from properties
-	if shareID, ok := sv.Properties[nastyapi.PropertyNFSShareID]; ok && shareID != "" {
-		// Delete NFS share first
-		if err := client.DeleteNFSShare(ctx, shareID); err != nil {
-			// Log but continue - share may already be deleted
-			fmt.Printf("(warning: failed to delete NFS share %s: %v) ", shareID, err)
+	// Find NFS share by path match
+	if sv.Path != "" {
+		shares, err := client.ListNFSShares(ctx)
+		if err == nil {
+			for i := range shares {
+				if shares[i].Path == sv.Path {
+					if err := client.DeleteNFSShare(ctx, shares[i].ID); err != nil {
+						fmt.Printf("(warning: failed to delete NFS share %s: %v) ", shares[i].ID, err)
+					}
+					break
+				}
+			}
 		}
 	}
 
 	// Delete the subvolume
-	return client.DeleteSubvolume(ctx, sv.Pool, sv.Name)
+	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteNVMeOFVolumeResources deletes NVMe-oF subsystem and zvol.
 func deleteNVMeOFVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Get subsystem ID and delete it
-	if subsysID, ok := sv.Properties[nastyapi.PropertyNVMeSubsystemID]; ok && subsysID != "" {
-		if err := client.DeleteNVMeOFSubsystem(ctx, subsysID); err != nil {
-			// Log but continue
-			fmt.Printf("(warning: failed to delete NVMe subsystem %s: %v) ", subsysID, err)
+	// Find subsystem by NQN suffix matching volume name
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName != "" {
+		suffix := ":" + volumeName
+		subsystems, err := client.ListNVMeOFSubsystems(ctx)
+		if err == nil {
+			for i := range subsystems {
+				if strings.HasSuffix(subsystems[i].NQN, suffix) {
+					if err := client.DeleteNVMeOFSubsystem(ctx, subsystems[i].ID); err != nil {
+						fmt.Printf("(warning: failed to delete NVMe subsystem %s: %v) ", subsystems[i].ID, err)
+					}
+					break
+				}
+			}
 		}
 	}
 
 	// Delete the zvol
-	return client.DeleteSubvolume(ctx, sv.Pool, sv.Name)
+	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteSMBVolumeResources deletes SMB share and subvolume.
 func deleteSMBVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Get SMB share ID from properties
-	if shareID, ok := sv.Properties[nastyapi.PropertySMBShareID]; ok && shareID != "" {
-		// Delete SMB share first
-		if err := client.DeleteSMBShare(ctx, shareID); err != nil {
-			// Log but continue - share may already be deleted
-			fmt.Printf("(warning: failed to delete SMB share %s: %v) ", shareID, err)
+	// Find SMB share by path match
+	if sv.Path != "" {
+		shares, err := client.ListSMBShares(ctx)
+		if err == nil {
+			for i := range shares {
+				if shares[i].Path == sv.Path {
+					if err := client.DeleteSMBShare(ctx, shares[i].ID); err != nil {
+						fmt.Printf("(warning: failed to delete SMB share %s: %v) ", shares[i].ID, err)
+					}
+					break
+				}
+			}
 		}
 	}
 
 	// Delete the subvolume
-	return client.DeleteSubvolume(ctx, sv.Pool, sv.Name)
+	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteISCSIVolumeResources deletes iSCSI target and zvol.
 func deleteISCSIVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Get target ID and delete it
-	if targetID, ok := sv.Properties[nastyapi.PropertyISCSITargetID]; ok && targetID != "" {
-		if err := client.DeleteISCSITarget(ctx, targetID); err != nil {
-			fmt.Printf("(warning: failed to delete iSCSI target %s: %v) ", targetID, err)
+	// Find target by IQN suffix matching volume name
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName != "" {
+		suffix := ":" + volumeName
+		targets, err := client.ListISCSITargets(ctx)
+		if err == nil {
+			for i := range targets {
+				if strings.HasSuffix(targets[i].IQN, suffix) {
+					if err := client.DeleteISCSITarget(ctx, targets[i].ID); err != nil {
+						fmt.Printf("(warning: failed to delete iSCSI target %s: %v) ", targets[i].ID, err)
+					}
+					break
+				}
+			}
 		}
 	}
 
 	// Delete the zvol
-	return client.DeleteSubvolume(ctx, sv.Pool, sv.Name)
+	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // showCleanupPreview displays the volumes that will be deleted.

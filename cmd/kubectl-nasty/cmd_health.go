@@ -29,13 +29,13 @@ By default, only volumes with issues are shown. Use --all to show all volumes.
 
 Examples:
   # Show only volumes with issues
-  kubectl nasty-csi health
+  kubectl nasty health
 
   # Show all volumes including healthy ones
-  kubectl nasty-csi health --all
+  kubectl nasty health --all
 
   # Output as JSON
-  kubectl nasty-csi health -o json`,
+  kubectl nasty health -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runHealth(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, showAll)
 		},

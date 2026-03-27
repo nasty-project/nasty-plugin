@@ -37,13 +37,13 @@ the existing NASty dataset, and the PVC binds to it.
 
 Examples:
   # Generate manifests for a specific dataset
-  kubectl nasty-csi adopt tank/csi/pvc-abc123 --pvc-name my-data --namespace default
+  kubectl nasty adopt tank/csi/pvc-abc123 --pvc-name my-data --namespace default
 
   # Use stored PVC metadata from volume properties
-  kubectl nasty-csi adopt tank/csi/pvc-abc123
+  kubectl nasty adopt tank/csi/pvc-abc123
 
   # Output as single YAML document
-  kubectl nasty-csi adopt tank/csi/pvc-abc123 -o yaml > adopt.yaml
+  kubectl nasty adopt tank/csi/pvc-abc123 -o yaml > adopt.yaml
   kubectl apply -f adopt.yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -84,7 +84,7 @@ func runAdopt(ctx context.Context, url, apiKey, secretRef, _ *string, skipTLSVer
 	}
 
 	// Extract volume metadata
-	volumeInfo, err := extractVolumeInfo(dataset)
+	volumeInfo, err := extractVolumeInfo(ctx, client, dataset)
 	if err != nil {
 		return fmt.Errorf("dataset %s is not a valid nasty-csi volume: %w", datasetPath, err)
 	}
@@ -142,7 +142,7 @@ func getDatasetWithProperties(ctx context.Context, client nastyapi.ClientInterfa
 
 	// Look for exact match
 	for i := range datasets {
-		if datasets[i].Pool+"/"+datasets[i].Name == datasetPath {
+		if datasets[i].Filesystem+"/"+datasets[i].Name == datasetPath {
 			return &datasets[i], nil
 		}
 	}
@@ -155,7 +155,7 @@ func getDatasetWithProperties(ctx context.Context, client nastyapi.ClientInterfa
 	}
 
 	for i := range allDatasets {
-		if allDatasets[i].Pool+"/"+allDatasets[i].Name == datasetPath {
+		if allDatasets[i].Filesystem+"/"+allDatasets[i].Name == datasetPath {
 			return &allDatasets[i], nil
 		}
 	}
@@ -163,7 +163,7 @@ func getDatasetWithProperties(ctx context.Context, client nastyapi.ClientInterfa
 	return nil, fmt.Errorf("%w: %s", errDatasetNotFound, datasetPath)
 }
 
-func extractVolumeInfo(ds *nastyapi.Subvolume) (*adoptionVolumeInfo, error) {
+func extractVolumeInfo(ctx context.Context, client nastyapi.ClientInterface, ds *nastyapi.Subvolume) (*adoptionVolumeInfo, error) {
 	props := ds.Properties
 	if props == nil {
 		return nil, errNoUserProperties
@@ -175,7 +175,7 @@ func extractVolumeInfo(ds *nastyapi.Subvolume) (*adoptionVolumeInfo, error) {
 	}
 
 	info := &adoptionVolumeInfo{
-		dataset:   ds.Pool + "/" + ds.Name,
+		dataset:   ds.Filesystem + "/" + ds.Name,
 		namespace: "default", // Default
 	}
 
@@ -217,24 +217,58 @@ func extractVolumeInfo(ds *nastyapi.Subvolume) (*adoptionVolumeInfo, error) {
 		info.storageClass = val
 	}
 
-	// Extract NFS-specific info
-	if val, ok := props[nastyapi.PropertyNFSSharePath]; ok {
-		info.nfsSharePath = val
-	}
-
-	// Extract NVMe-oF-specific info
-	if val, ok := props[nastyapi.PropertyNVMeSubsystemNQN]; ok {
-		info.nvmeNQN = val
-	}
-
-	// Extract iSCSI-specific info
-	if val, ok := props[nastyapi.PropertyISCSIIQN]; ok {
-		info.iscsiIQN = val
-	}
-
-	// Extract SMB-specific info
-	if val, ok := props[nastyapi.PropertySMBShareName]; ok {
-		info.smbShareName = val
+	// Discover protocol-specific resources dynamically
+	switch info.protocol {
+	case nastyapi.ProtocolNFS:
+		// Match NFS share by subvolume path
+		if ds.Path != "" {
+			if shares, err := client.ListNFSShares(ctx); err == nil {
+				for i := range shares {
+					if shares[i].Path == ds.Path {
+						info.nfsSharePath = shares[i].Path
+						break
+					}
+				}
+			}
+		}
+	case nastyapi.ProtocolNVMeOF:
+		// Match NVMe-oF subsystem by NQN suffix
+		if info.volumeID != "" {
+			suffix := ":" + info.volumeID
+			if subsystems, err := client.ListNVMeOFSubsystems(ctx); err == nil {
+				for i := range subsystems {
+					if strings.HasSuffix(subsystems[i].NQN, suffix) {
+						info.nvmeNQN = subsystems[i].NQN
+						break
+					}
+				}
+			}
+		}
+	case nastyapi.ProtocolISCSI:
+		// Match iSCSI target by IQN suffix
+		if info.volumeID != "" {
+			suffix := ":" + info.volumeID
+			if targets, err := client.ListISCSITargets(ctx); err == nil {
+				for i := range targets {
+					if strings.HasSuffix(targets[i].IQN, suffix) {
+						info.iscsiIQN = targets[i].IQN
+						break
+					}
+				}
+			}
+		}
+	case nastyapi.ProtocolSMB:
+		// Match SMB share by subvolume path
+		if ds.Path != "" {
+			if shares, err := client.ListSMBShares(ctx); err == nil {
+				for i := range shares {
+					if shares[i].Path == ds.Path {
+						info.smbShareName = shares[i].Name
+						break
+					}
+				}
+			}
+		}
 	}
 
 	return info, nil
@@ -341,7 +375,7 @@ func generatePV(info *adoptionVolumeInfo, server string) map[string]interface{} 
 		"metadata": map[string]interface{}{
 			"name": pvName,
 			"labels": map[string]string{
-				"app.kubernetes.io/managed-by": "kubectl-nasty-csi",
+				"app.kubernetes.io/managed-by": "kubectl-nasty",
 				"nasty-csi.io/adopted":           "true",
 			},
 			"annotations": map[string]string{
@@ -376,7 +410,7 @@ func generatePVC(info *adoptionVolumeInfo) map[string]interface{} {
 			"name":      info.pvcName,
 			"namespace": info.namespace,
 			"labels": map[string]string{
-				"app.kubernetes.io/managed-by": "kubectl-nasty-csi",
+				"app.kubernetes.io/managed-by": "kubectl-nasty",
 				"nasty-csi.io/adopted":           "true",
 			},
 			"annotations": map[string]string{

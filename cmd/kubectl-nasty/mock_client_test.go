@@ -13,24 +13,27 @@ var _ nastyapi.ClientInterface = (*mockClient)(nil)
 // mockClient is a function-injection mock implementing nastyapi.ClientInterface.
 // Each method has an optional func field; if nil, returns a default error.
 type mockClient struct {
-	// Pool operations
-	QueryPoolFunc func(ctx context.Context, poolName string) (*nastyapi.Pool, error)
+	// Filesystem operations
+	QueryFilesystemFunc func(ctx context.Context, fsName string) (*nastyapi.Filesystem, error)
 
 	// Subvolume operations
 	CreateSubvolumeFunc          func(ctx context.Context, params nastyapi.SubvolumeCreateParams) (*nastyapi.Subvolume, error)
-	DeleteSubvolumeFunc          func(ctx context.Context, pool, name string) error
-	GetSubvolumeFunc             func(ctx context.Context, pool, name string) (*nastyapi.Subvolume, error)
-	ListAllSubvolumesFunc        func(ctx context.Context, pool string) ([]nastyapi.Subvolume, error)
-	SetSubvolumePropertiesFunc   func(ctx context.Context, pool, name string, props map[string]string) (*nastyapi.Subvolume, error)
-	RemoveSubvolumePropertiesFunc func(ctx context.Context, pool, name string, keys []string) (*nastyapi.Subvolume, error)
-	FindSubvolumesByPropertyFunc func(ctx context.Context, key, value, pool string) ([]nastyapi.Subvolume, error)
-	FindManagedSubvolumesFunc    func(ctx context.Context, pool string) ([]nastyapi.Subvolume, error)
-	FindSubvolumeByCSIVolumeNameFunc func(ctx context.Context, pool, volumeName string) (*nastyapi.Subvolume, error)
+	DeleteSubvolumeFunc          func(ctx context.Context, filesystem, name string) error
+	GetSubvolumeFunc             func(ctx context.Context, filesystem, name string) (*nastyapi.Subvolume, error)
+	ListAllSubvolumesFunc        func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
+	ResizeSubvolumeFunc          func(ctx context.Context, filesystem, name string, volsizeBytes uint64) (*nastyapi.Subvolume, error)
+	CloneSubvolumeFunc           func(ctx context.Context, filesystem, name, newName string) (*nastyapi.Subvolume, error)
+	SetSubvolumePropertiesFunc   func(ctx context.Context, filesystem, name string, props map[string]string) (*nastyapi.Subvolume, error)
+	RemoveSubvolumePropertiesFunc func(ctx context.Context, filesystem, name string, keys []string) (*nastyapi.Subvolume, error)
+	FindSubvolumesByPropertyFunc func(ctx context.Context, key, value, filesystem string) ([]nastyapi.Subvolume, error)
+	FindManagedSubvolumesFunc    func(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error)
+	FindSubvolumeByCSIVolumeNameFunc func(ctx context.Context, filesystem, volumeName string) (*nastyapi.Subvolume, error)
 
 	// Snapshot operations
 	CreateSnapshotFunc func(ctx context.Context, params nastyapi.SnapshotCreateParams) (*nastyapi.Snapshot, error)
-	DeleteSnapshotFunc func(ctx context.Context, pool, subvolume, name string) error
-	ListSnapshotsFunc  func(ctx context.Context, pool string) ([]nastyapi.Snapshot, error)
+	DeleteSnapshotFunc func(ctx context.Context, filesystem, subvolume, name string) error
+	ListSnapshotsFunc  func(ctx context.Context, filesystem string) ([]nastyapi.Snapshot, error)
+	CloneSnapshotFunc  func(ctx context.Context, params nastyapi.SnapshotCloneParams) (*nastyapi.Subvolume, error)
 
 	// NFS share operations
 	CreateNFSShareFunc func(ctx context.Context, params nastyapi.NFSShareCreateParams) (*nastyapi.NFSShare, error)
@@ -62,11 +65,11 @@ type mockClient struct {
 // errNotImplemented is the default error returned when a mock function is not set.
 var errNotImplemented = errors.New("not implemented in mock")
 
-// Pool operations.
+// Filesystem operations.
 
-func (m *mockClient) QueryPool(ctx context.Context, poolName string) (*nastyapi.Pool, error) {
-	if m.QueryPoolFunc != nil {
-		return m.QueryPoolFunc(ctx, poolName)
+func (m *mockClient) QueryFilesystem(ctx context.Context, fsName string) (*nastyapi.Filesystem, error) {
+	if m.QueryFilesystemFunc != nil {
+		return m.QueryFilesystemFunc(ctx, fsName)
 	}
 	return nil, errNotImplemented
 }
@@ -80,58 +83,72 @@ func (m *mockClient) CreateSubvolume(ctx context.Context, params nastyapi.Subvol
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) DeleteSubvolume(ctx context.Context, pool, name string) error {
+func (m *mockClient) DeleteSubvolume(ctx context.Context, filesystem, name string) error {
 	if m.DeleteSubvolumeFunc != nil {
-		return m.DeleteSubvolumeFunc(ctx, pool, name)
+		return m.DeleteSubvolumeFunc(ctx, filesystem, name)
 	}
 	return errNotImplemented
 }
 
-func (m *mockClient) GetSubvolume(ctx context.Context, pool, name string) (*nastyapi.Subvolume, error) {
+func (m *mockClient) GetSubvolume(ctx context.Context, filesystem, name string) (*nastyapi.Subvolume, error) {
 	if m.GetSubvolumeFunc != nil {
-		return m.GetSubvolumeFunc(ctx, pool, name)
+		return m.GetSubvolumeFunc(ctx, filesystem, name)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) ListAllSubvolumes(ctx context.Context, pool string) ([]nastyapi.Subvolume, error) {
+func (m *mockClient) ListAllSubvolumes(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error) {
 	if m.ListAllSubvolumesFunc != nil {
-		return m.ListAllSubvolumesFunc(ctx, pool)
+		return m.ListAllSubvolumesFunc(ctx, filesystem)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) SetSubvolumeProperties(ctx context.Context, pool, name string, props map[string]string) (*nastyapi.Subvolume, error) {
+func (m *mockClient) ResizeSubvolume(ctx context.Context, filesystem, name string, volsizeBytes uint64) (*nastyapi.Subvolume, error) {
+	if m.ResizeSubvolumeFunc != nil {
+		return m.ResizeSubvolumeFunc(ctx, filesystem, name, volsizeBytes)
+	}
+	return nil, errNotImplemented
+}
+
+func (m *mockClient) CloneSubvolume(ctx context.Context, filesystem, name, newName string) (*nastyapi.Subvolume, error) {
+	if m.CloneSubvolumeFunc != nil {
+		return m.CloneSubvolumeFunc(ctx, filesystem, name, newName)
+	}
+	return nil, errNotImplemented
+}
+
+func (m *mockClient) SetSubvolumeProperties(ctx context.Context, filesystem, name string, props map[string]string) (*nastyapi.Subvolume, error) {
 	if m.SetSubvolumePropertiesFunc != nil {
-		return m.SetSubvolumePropertiesFunc(ctx, pool, name, props)
+		return m.SetSubvolumePropertiesFunc(ctx, filesystem, name, props)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) RemoveSubvolumeProperties(ctx context.Context, pool, name string, keys []string) (*nastyapi.Subvolume, error) {
+func (m *mockClient) RemoveSubvolumeProperties(ctx context.Context, filesystem, name string, keys []string) (*nastyapi.Subvolume, error) {
 	if m.RemoveSubvolumePropertiesFunc != nil {
-		return m.RemoveSubvolumePropertiesFunc(ctx, pool, name, keys)
+		return m.RemoveSubvolumePropertiesFunc(ctx, filesystem, name, keys)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) FindSubvolumesByProperty(ctx context.Context, key, value, pool string) ([]nastyapi.Subvolume, error) {
+func (m *mockClient) FindSubvolumesByProperty(ctx context.Context, key, value, filesystem string) ([]nastyapi.Subvolume, error) {
 	if m.FindSubvolumesByPropertyFunc != nil {
-		return m.FindSubvolumesByPropertyFunc(ctx, key, value, pool)
+		return m.FindSubvolumesByPropertyFunc(ctx, key, value, filesystem)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) FindManagedSubvolumes(ctx context.Context, pool string) ([]nastyapi.Subvolume, error) {
+func (m *mockClient) FindManagedSubvolumes(ctx context.Context, filesystem string) ([]nastyapi.Subvolume, error) {
 	if m.FindManagedSubvolumesFunc != nil {
-		return m.FindManagedSubvolumesFunc(ctx, pool)
+		return m.FindManagedSubvolumesFunc(ctx, filesystem)
 	}
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) FindSubvolumeByCSIVolumeName(ctx context.Context, pool, volumeName string) (*nastyapi.Subvolume, error) {
+func (m *mockClient) FindSubvolumeByCSIVolumeName(ctx context.Context, filesystem, volumeName string) (*nastyapi.Subvolume, error) {
 	if m.FindSubvolumeByCSIVolumeNameFunc != nil {
-		return m.FindSubvolumeByCSIVolumeNameFunc(ctx, pool, volumeName)
+		return m.FindSubvolumeByCSIVolumeNameFunc(ctx, filesystem, volumeName)
 	}
 	return nil, errNotImplemented
 }
@@ -145,16 +162,23 @@ func (m *mockClient) CreateSnapshot(ctx context.Context, params nastyapi.Snapsho
 	return nil, errNotImplemented
 }
 
-func (m *mockClient) DeleteSnapshot(ctx context.Context, pool, subvolume, name string) error {
+func (m *mockClient) DeleteSnapshot(ctx context.Context, filesystem, subvolume, name string) error {
 	if m.DeleteSnapshotFunc != nil {
-		return m.DeleteSnapshotFunc(ctx, pool, subvolume, name)
+		return m.DeleteSnapshotFunc(ctx, filesystem, subvolume, name)
 	}
 	return errNotImplemented
 }
 
-func (m *mockClient) ListSnapshots(ctx context.Context, pool string) ([]nastyapi.Snapshot, error) {
+func (m *mockClient) ListSnapshots(ctx context.Context, filesystem string) ([]nastyapi.Snapshot, error) {
 	if m.ListSnapshotsFunc != nil {
-		return m.ListSnapshotsFunc(ctx, pool)
+		return m.ListSnapshotsFunc(ctx, filesystem)
+	}
+	return nil, errNotImplemented
+}
+
+func (m *mockClient) CloneSnapshot(ctx context.Context, params nastyapi.SnapshotCloneParams) (*nastyapi.Subvolume, error) {
+	if m.CloneSnapshotFunc != nil {
+		return m.CloneSnapshotFunc(ctx, params)
 	}
 	return nil, errNotImplemented
 }

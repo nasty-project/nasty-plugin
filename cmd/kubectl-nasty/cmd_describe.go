@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/nasty-project/nasty-go/dashboard"
-	nastyapi "github.com/nasty-project/nasty-go"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -35,13 +34,13 @@ The volume can be specified by:
 
 Examples:
   # Describe a volume by CSI name
-  kubectl nasty-csi describe pvc-12345678-1234-1234-1234-123456789012
+  kubectl nasty describe pvc-12345678-1234-1234-1234-123456789012
 
   # Describe a volume by dataset path
-  kubectl nasty-csi describe tank/csi/my-volume
+  kubectl nasty describe tank/csi/my-volume
 
   # Output as YAML
-  kubectl nasty-csi describe pvc-xxx -o yaml`,
+  kubectl nasty describe pvc-xxx -o yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDescribe(cmd.Context(), args[0], url, apiKey, secretRef, outputFormat, skipTLSVerify)
@@ -154,30 +153,6 @@ func outputVolumeDetailsTable(details *VolumeDetails) error {
 	describeKV("Delete Strategy", details.DeleteStrategy)
 	describeKV("Adoptable", strconv.FormatBool(details.Adoptable))
 	fmt.Println()
-
-	// Clone info (if this volume was created from a snapshot or volume)
-	if details.ContentSourceType != "" || details.CloneMode != "" {
-		colorHeader.Println("=== Clone Info ===") //nolint:errcheck,gosec
-		if details.ContentSourceType != "" {
-			describeKV("Source Type", details.ContentSourceType)
-			describeKV("Source ID", details.ContentSourceID)
-		}
-		if details.CloneMode != "" {
-			describeKV("Clone Mode", details.CloneMode)
-			switch details.CloneMode {
-			case nastyapi.CloneModeCOW:
-				describeKV("Dependency", colorError.Sprint("CLONE depends on SNAPSHOT (snapshot cannot be deleted)"))
-				if details.OriginSnapshot != "" {
-					describeKV("Origin Snapshot", details.OriginSnapshot)
-				}
-			case nastyapi.CloneModePromoted:
-				describeKV("Dependency", colorSuccess.Sprint("SNAPSHOT depends on CLONE (snapshot CAN be deleted)"))
-			case nastyapi.CloneModeDetached:
-				describeKV("Dependency", colorSuccess.Sprint("None (fully independent copy via send/receive)"))
-			}
-		}
-		fmt.Println()
-	}
 
 	// Protocol-specific details
 	if details.NFSShare != nil {

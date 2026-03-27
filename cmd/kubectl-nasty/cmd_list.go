@@ -38,13 +38,13 @@ and displays their metadata.
 
 Examples:
   # List all volumes in table format
-  kubectl nasty-csi list
+  kubectl nasty list
 
   # List all volumes in YAML format
-  kubectl nasty-csi list -o yaml
+  kubectl nasty list -o yaml
 
   # List volumes using specific NASty connection
-  kubectl nasty-csi list --url wss://nasty:443/api/current --api-key <key>`,
+  kubectl nasty list --url wss://nasty:443/api/current --api-key <key>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID)
 		},
@@ -111,11 +111,7 @@ func outputVolumes(volumes []VolumeInfo, format string) error {
 			if v.Adoptable {
 				adoptable = colorSuccess.Sprint(valueTrue)
 			}
-			// Format clone source as "type:id" if present
 			cloneSource := ""
-			if v.ContentSourceType != "" && v.ContentSourceID != "" {
-				cloneSource = fmt.Sprintf("%s:%s", v.ContentSourceType, v.ContentSourceID)
-			}
 			// K8s PVC/Namespace
 			pvcName := colorMuted.Sprint("-")
 			pvcNamespace := colorMuted.Sprint("-")

@@ -64,7 +64,7 @@ jobs:
 
       - name: Cross-compile check
         run: |
-          GOOS=linux   GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty-csi
-          GOOS=darwin  GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty-csi
-          GOOS=darwin  GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty-csi
-          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty-csi
+          GOOS=linux   GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty
+          GOOS=darwin  GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty
+          GOOS=darwin  GOARCH=arm64 go build -o /dev/null ./cmd/kubectl-nasty
+          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/kubectl-nasty

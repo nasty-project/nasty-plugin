@@ -1,17 +1,17 @@
-// Package main implements the kubectl-nasty-csi plugin for managing NASty CSI volumes.
+// Package main implements the kubectl-nasty plugin for managing NASty CSI volumes.
 //
 // Installation:
 //
-//	go build -o kubectl-nasty-csi ./cmd/kubectl-nasty-csi
-//	mv kubectl-nasty-csi /usr/local/bin/  # or anywhere in PATH
+//	go build -o kubectl-nasty ./cmd/kubectl-nasty
+//	mv kubectl-nasty /usr/local/bin/  # or anywhere in PATH
 //
 // Usage:
 //
-//	kubectl nasty-csi list                     # List all nasty-csi managed volumes
-//	kubectl nasty-csi list-orphaned            # Find volumes with no matching PVC
-//	kubectl nasty-csi adopt <dataset-path>     # Generate static PV manifest
-//	kubectl nasty-csi status <pvc-name>        # Show volume status from NASty
-//	kubectl nasty-csi connectivity             # Test NASty connection
+//	kubectl nasty list                     # List all nasty-csi managed volumes
+//	kubectl nasty list-orphaned            # Find volumes with no matching PVC
+//	kubectl nasty adopt <dataset-path>     # Generate static PV manifest
+//	kubectl nasty status <pvc-name>        # Show volume status from NASty
+//	kubectl nasty connectivity             # Test NASty connection
 package main
 
 import (
@@ -43,9 +43,9 @@ func newRootCmd() *cobra.Command {
 	)
 
 	rootCmd := &cobra.Command{
-		Use:   "kubectl-nasty-csi",
+		Use:   "kubectl-nasty",
 		Short: "Manage NASty CSI volumes",
-		Long: `kubectl-nasty-csi is a kubectl plugin for managing NASty CSI driver volumes.
+		Long: `kubectl-nasty is a kubectl plugin for managing NASty CSI driver volumes.
 
 It provides commands for discovering orphaned volumes, adopting volumes across
 clusters, and troubleshooting volume issues.

@@ -24,13 +24,13 @@ This command:
 
 Examples:
   # Test connectivity using flags
-  kubectl nasty-csi connectivity --url wss://nasty:443/api/current --api-key <key>
+  kubectl nasty connectivity --url wss://nasty:443/api/current --api-key <key>
 
   # Test using credentials from secret
-  kubectl nasty-csi connectivity --secret kube-system/nasty-csi-config
+  kubectl nasty connectivity --secret kube-system/nasty-csi-config
 
   # Test with custom timeout
-  kubectl nasty-csi connectivity --timeout 30s`,
+  kubectl nasty connectivity --timeout 30s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConnectivity(cmd.Context(), url, apiKey, secretRef, skipTLSVerify, clusterID, timeout)
 		},
@@ -82,11 +82,11 @@ func runConnectivity(ctx context.Context, url, apiKey, secretRef *string, skipTL
 	printStep(colorMuted.Sprint("..."), "Verifying API access...")
 	startTime = time.Now()
 
-	pool, err := client.QueryPool(ctx, "")
+	fs, err := client.QueryFilesystem(ctx, "")
 	if err != nil {
-		fmt.Printf("  %s\n", colorMuted.Sprint("(No default pool, checking pool access...)"))
-	} else if pool != nil {
-		fmt.Printf("  Found pool: %s\n", pool.Name)
+		fmt.Printf("  %s\n", colorMuted.Sprint("(No default filesystem, checking access...)"))
+	} else if fs != nil {
+		fmt.Printf("  Found filesystem: %s\n", fs.Name)
 	}
 
 	queryTime := time.Since(startTime)

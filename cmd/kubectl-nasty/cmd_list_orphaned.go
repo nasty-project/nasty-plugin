@@ -44,10 +44,10 @@ This is useful for:
 
 Examples:
   # Find orphaned volumes
-  kubectl nasty-csi list-orphaned
+  kubectl nasty list-orphaned
 
   # Output in YAML for scripting
-  kubectl nasty-csi list-orphaned -o yaml`,
+  kubectl nasty list-orphaned -o yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListOrphaned(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify, clusterID, allNamespaces)
 		},

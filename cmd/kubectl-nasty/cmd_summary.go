@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nasty-project/nasty-go/dashboard"
 	nastyapi "github.com/nasty-project/nasty-go"
@@ -73,10 +74,10 @@ Shows:
 
 Examples:
   # Show summary
-  kubectl nasty-csi summary
+  kubectl nasty summary
 
   # Output as JSON for scripting
-  kubectl nasty-csi summary -o json`,
+  kubectl nasty summary -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSummary(cmd.Context(), url, apiKey, secretRef, outputFormat, skipTLSVerify)
 		},
@@ -190,12 +191,6 @@ func processVolumeSubvolumes(subvols []nastyapi.Subvolume, sc *summaryContext, s
 	for i := range subvols {
 		sv := &subvols[i]
 
-		// Skip detached snapshots (they're counted separately)
-		if sv.Properties[nastyapi.PropertyDetachedSnapshot] == valueTrue {
-			summary.Snapshots.Detached++
-			continue
-		}
-
 		// Skip subvolumes without volume ID (not actual volumes)
 		volumeID := sv.Properties[nastyapi.PropertyCSIVolumeName]
 		if volumeID == "" {
@@ -224,11 +219,6 @@ func processSubvolume(sv *nastyapi.Subvolume, sc *summaryContext, summary *Summa
 		summary.Volumes.ISCSI++
 	case protocolSMB:
 		summary.Volumes.SMB++
-	}
-
-	// Check if it's a clone
-	if sv.Properties[nastyapi.PropertyContentSourceType] != "" {
-		summary.Volumes.Clones++
 	}
 
 	// Add capacity
@@ -275,10 +265,6 @@ func countAttachedSnapshots(subvols []nastyapi.Subvolume, summary *Summary) {
 	for i := range subvols {
 		sv := &subvols[i]
 
-		// Skip detached snapshots
-		if sv.Properties[nastyapi.PropertyDetachedSnapshot] == valueTrue {
-			continue
-		}
 		// Skip non-volumes
 		if sv.Properties[nastyapi.PropertyCSIVolumeName] == "" {
 			continue
@@ -292,10 +278,7 @@ func countAttachedSnapshots(subvols []nastyapi.Subvolume, summary *Summary) {
 // checkNFSHealthForSummary checks if NFS volume is healthy.
 // Returns empty string if healthy, or a short issue description.
 func checkNFSHealthForSummary(sv *nastyapi.Subvolume, nfsShareMap map[string]*nastyapi.NFSShare) string {
-	sharePath := sv.Properties[nastyapi.PropertyNFSSharePath]
-	if sharePath == "" {
-		sharePath = sv.Path
-	}
+	sharePath := sv.Path
 
 	if sharePath == "" {
 		return "no NFS share path configured"
@@ -316,31 +299,34 @@ func checkNFSHealthForSummary(sv *nastyapi.Subvolume, nfsShareMap map[string]*na
 // checkNVMeOFHealthForSummary checks if NVMe-oF volume is healthy.
 // Returns empty string if healthy, or a short issue description.
 func checkNVMeOFHealthForSummary(sv *nastyapi.Subvolume, nvmeSubsysMap map[string]*nastyapi.NVMeOFSubsystem) string {
-	nqn := sv.Properties[nastyapi.PropertyNVMeSubsystemNQN]
-
-	if nqn == "" {
-		return "no NVMe-oF subsystem NQN configured"
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName == "" {
+		return "no CSI volume name"
 	}
 
-	_, exists := nvmeSubsysMap[nqn]
-	if !exists {
-		return "NVMe-oF subsystem not found"
+	suffix := ":" + volumeName
+	for nqn := range nvmeSubsysMap {
+		if strings.HasSuffix(nqn, suffix) {
+			return ""
+		}
 	}
 
-	return ""
+	return "NVMe-oF subsystem not found"
 }
 
 // checkISCSIHealthForSummary checks if iSCSI volume is healthy.
 // Returns empty string if healthy, or a short issue description.
 func checkISCSIHealthForSummary(sv *nastyapi.Subvolume, iscsiTargetMap map[string]*nastyapi.ISCSITarget) string {
-	iqn := sv.Properties[nastyapi.PropertyISCSIIQN]
-
-	if iqn == "" {
-		return "no iSCSI IQN configured"
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName == "" {
+		return "no CSI volume name"
 	}
 
-	if _, exists := iscsiTargetMap[iqn]; exists {
-		return ""
+	suffix := ":" + volumeName
+	for iqn := range iscsiTargetMap {
+		if strings.HasSuffix(iqn, suffix) {
+			return ""
+		}
 	}
 
 	return "iSCSI target not found"
@@ -467,7 +453,7 @@ func outputSummaryTable(summary *Summary) error {
 			fmt.Printf("  %s %s\n", colorError.Sprint("-"), issue)
 		}
 		fmt.Println()
-		colorMuted.Println("Run 'kubectl nasty-csi health' for full details.") //nolint:errcheck,gosec
+		colorMuted.Println("Run 'kubectl nasty health' for full details.") //nolint:errcheck,gosec
 	}
 
 	return nil

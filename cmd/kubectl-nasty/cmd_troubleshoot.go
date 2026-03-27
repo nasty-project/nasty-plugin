@@ -81,13 +81,13 @@ This command performs comprehensive checks:
 
 Examples:
   # Troubleshoot a PVC in default namespace
-  kubectl nasty-csi troubleshoot my-pvc
+  kubectl nasty troubleshoot my-pvc
 
   # Troubleshoot a PVC in specific namespace
-  kubectl nasty-csi troubleshoot my-pvc -n my-namespace
+  kubectl nasty troubleshoot my-pvc -n my-namespace
 
   # Include CSI controller logs in output
-  kubectl nasty-csi troubleshoot my-pvc --logs`,
+  kubectl nasty troubleshoot my-pvc --logs`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTroubleshoot(cmd.Context(), args[0], namespace, url, apiKey, secretRef, outputFormat, skipTLSVerify, showLogs)
@@ -233,7 +233,7 @@ func runTroubleshoot(ctx context.Context, pvcName, namespace string, url, apiKey
 	result.Checks = append(result.Checks, TroubleshootCheck{
 		Name:    "NASty Dataset",
 		Status:  statusOK,
-		Message: "Dataset found: " + subvol.Pool + "/" + subvol.Name,
+		Message: "Dataset found: " + subvol.Filesystem + "/" + subvol.Name,
 	})
 
 	// Step 6: Check protocol-specific resources
@@ -327,13 +327,7 @@ func findSubvolumeByVolumeID(ctx context.Context, client nastyapi.ClientInterfac
 
 // checkNFSResourcesForTroubleshoot checks NFS-specific resources on NASty.
 func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume, result *TroubleshootResult) {
-	sharePath := ""
-	if sv.Properties != nil {
-		sharePath = sv.Properties[nastyapi.PropertyNFSSharePath]
-	}
-	if sharePath == "" {
-		sharePath = sv.Path
-	}
+	sharePath := sv.Path
 
 	if sharePath == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
@@ -391,36 +385,45 @@ func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 // checkNVMeOFResourcesForTroubleshoot checks NVMe-oF-specific resources on NASty.
 func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume, result *TroubleshootResult) {
-	nqn := ""
+	volumeName := ""
 	if sv.Properties != nil {
-		nqn = sv.Properties[nastyapi.PropertyNVMeSubsystemNQN]
+		volumeName = sv.Properties[nastyapi.PropertyCSIVolumeName]
 	}
 
-	if nqn == "" {
+	if volumeName == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NVMe-oF Subsystem NQN",
+			Name:    "NVMe-oF Subsystem",
 			Status:  statusWarning,
-			Message: "No subsystem NQN found in volume properties",
+			Message: "No CSI volume name found in properties",
 		})
 		return
 	}
 
-	subsystem, err := client.GetNVMeOFSubsystemByNQN(ctx, nqn)
+	// Find subsystem by NQN suffix matching volume name
+	suffix := ":" + volumeName
+	subsystems, err := client.ListNVMeOFSubsystems(ctx)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
 			Name:    "NVMe-oF Subsystem",
 			Status:  statusError,
-			Message: "NVMe-oF subsystem not found: " + nqn,
+			Message: "Failed to list NVMe-oF subsystems: " + err.Error(),
 		})
-		result.Suggestions = append(result.Suggestions, "The NVMe-oF subsystem may have been deleted - delete/recreate the PVC")
 		return
+	}
+
+	var subsystem *nastyapi.NVMeOFSubsystem
+	for i := range subsystems {
+		if strings.HasSuffix(subsystems[i].NQN, suffix) {
+			subsystem = &subsystems[i]
+			break
+		}
 	}
 
 	if subsystem == nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
 			Name:    "NVMe-oF Subsystem",
 			Status:  statusError,
-			Message: "NVMe-oF subsystem not found: " + nqn,
+			Message: "NVMe-oF subsystem not found for volume " + volumeName,
 		})
 		result.Suggestions = append(result.Suggestions, "The NVMe-oF subsystem may have been deleted - delete/recreate the PVC")
 		return
@@ -445,40 +448,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 
 // checkSMBResourcesForTroubleshoot checks SMB-specific resources on NASty.
 func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume, result *TroubleshootResult) {
-	// Try share ID from properties first
-	if sv.Properties != nil {
-		if shareID := sv.Properties[nastyapi.PropertySMBShareID]; shareID != "" {
-			share, err := client.GetSMBShare(ctx, shareID)
-			if err != nil || share == nil {
-				result.Checks = append(result.Checks, TroubleshootCheck{
-					Name:    "SMB Share",
-					Status:  statusError,
-					Message: fmt.Sprintf("SMB share not found (ID: %s)", shareID),
-				})
-				result.Suggestions = append(result.Suggestions, "The SMB share may have been deleted - recreate it or delete/recreate the PVC")
-				return
-			}
-
-			if !share.Enabled {
-				result.Checks = append(result.Checks, TroubleshootCheck{
-					Name:    "SMB Share",
-					Status:  statusError,
-					Message: "SMB share exists but is disabled",
-				})
-				result.Suggestions = append(result.Suggestions, "Enable the SMB share in NASty UI or via API")
-				return
-			}
-
-			result.Checks = append(result.Checks, TroubleshootCheck{
-				Name:    "SMB Share",
-				Status:  statusOK,
-				Message: fmt.Sprintf("SMB share found and enabled (ID: %s, Name: %s)", share.ID, share.Name),
-			})
-			return
-		}
-	}
-
-	// Fallback: query by path
+	// Find SMB share by path
 	sharePath := sv.Path
 	if sharePath == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
@@ -536,26 +506,45 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 // checkISCSIResourcesForTroubleshoot checks iSCSI-specific resources on NASty.
 func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume, result *TroubleshootResult) {
-	iqn := ""
+	volumeName := ""
 	if sv.Properties != nil {
-		iqn = sv.Properties[nastyapi.PropertyISCSIIQN]
+		volumeName = sv.Properties[nastyapi.PropertyCSIVolumeName]
 	}
 
-	if iqn == "" {
+	if volumeName == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "iSCSI IQN",
+			Name:    "iSCSI Target",
 			Status:  statusWarning,
-			Message: "No IQN found in volume properties",
+			Message: "No CSI volume name found in properties",
 		})
 		return
 	}
 
-	target, err := client.GetISCSITargetByIQN(ctx, iqn)
-	if err != nil || target == nil {
+	// Find target by IQN suffix matching volume name
+	suffix := ":" + volumeName
+	targets, err := client.ListISCSITargets(ctx)
+	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
 			Name:    "iSCSI Target",
 			Status:  statusError,
-			Message: "iSCSI target not found for IQN: " + iqn,
+			Message: "Failed to list iSCSI targets: " + err.Error(),
+		})
+		return
+	}
+
+	var target *nastyapi.ISCSITarget
+	for i := range targets {
+		if strings.HasSuffix(targets[i].IQN, suffix) {
+			target = &targets[i]
+			break
+		}
+	}
+
+	if target == nil {
+		result.Checks = append(result.Checks, TroubleshootCheck{
+			Name:    "iSCSI Target",
+			Status:  statusError,
+			Message: "iSCSI target not found for volume " + volumeName,
 		})
 		result.Suggestions = append(result.Suggestions, "iSCSI target may have been deleted - delete/recreate the PVC")
 		return
@@ -564,7 +553,7 @@ func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cli
 	result.Checks = append(result.Checks, TroubleshootCheck{
 		Name:    "iSCSI Target",
 		Status:  statusOK,
-		Message: fmt.Sprintf("iSCSI target found (ID: %s, IQN: %s)", target.ID, iqn),
+		Message: fmt.Sprintf("iSCSI target found (ID: %s, IQN: %s)", target.ID, target.IQN),
 	})
 
 	// Check LUNs
