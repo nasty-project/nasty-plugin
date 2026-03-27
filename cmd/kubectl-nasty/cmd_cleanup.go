@@ -279,90 +279,99 @@ func deleteOrphanedVolume(ctx context.Context, client nastyapi.ClientInterface, 
 
 // deleteNFSVolumeResources deletes NFS share and subvolume.
 func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Find NFS share by path match
 	if sv.Path != "" {
-		shares, err := client.ListNFSShares(ctx)
-		if err == nil {
+		if shares, err := client.ListNFSShares(ctx); err == nil {
 			for i := range shares {
-				if shares[i].Path == sv.Path {
-					if err := client.DeleteNFSShare(ctx, shares[i].ID); err != nil {
-						fmt.Printf("(warning: failed to delete NFS share %s: %v) ", shares[i].ID, err)
-					}
-					break
+				if shares[i].Path != sv.Path {
+					continue
 				}
+				if err := client.DeleteNFSShare(ctx, shares[i].ID); err != nil {
+					fmt.Printf("(warning: failed to delete NFS share %s: %v) ", shares[i].ID, err)
+				}
+				break
 			}
 		}
 	}
-
-	// Delete the subvolume
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteNVMeOFVolumeResources deletes NVMe-oF subsystem and zvol.
 func deleteNVMeOFVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Find subsystem by NQN suffix matching volume name
-	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
-	if volumeName != "" {
-		suffix := ":" + volumeName
+	deleteMatchingSuffix(sv, func() ([]idAndName, error) {
 		subsystems, err := client.ListNVMeOFSubsystems(ctx)
-		if err == nil {
-			for i := range subsystems {
-				if strings.HasSuffix(subsystems[i].NQN, suffix) {
-					if err := client.DeleteNVMeOFSubsystem(ctx, subsystems[i].ID); err != nil {
-						fmt.Printf("(warning: failed to delete NVMe subsystem %s: %v) ", subsystems[i].ID, err)
-					}
-					break
-				}
-			}
+		if err != nil {
+			return nil, err
 		}
-	}
-
-	// Delete the zvol
+		items := make([]idAndName, len(subsystems))
+		for i := range subsystems {
+			items[i] = idAndName{id: subsystems[i].ID, name: subsystems[i].NQN}
+		}
+		return items, nil
+	}, func(id string) {
+		if err := client.DeleteNVMeOFSubsystem(ctx, id); err != nil {
+			fmt.Printf("(warning: failed to delete NVMe subsystem %s: %v) ", id, err)
+		}
+	})
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteSMBVolumeResources deletes SMB share and subvolume.
 func deleteSMBVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Find SMB share by path match
 	if sv.Path != "" {
-		shares, err := client.ListSMBShares(ctx)
-		if err == nil {
+		if shares, err := client.ListSMBShares(ctx); err == nil {
 			for i := range shares {
-				if shares[i].Path == sv.Path {
-					if err := client.DeleteSMBShare(ctx, shares[i].ID); err != nil {
-						fmt.Printf("(warning: failed to delete SMB share %s: %v) ", shares[i].ID, err)
-					}
-					break
+				if shares[i].Path != sv.Path {
+					continue
 				}
+				if err := client.DeleteSMBShare(ctx, shares[i].ID); err != nil {
+					fmt.Printf("(warning: failed to delete SMB share %s: %v) ", shares[i].ID, err)
+				}
+				break
 			}
 		}
 	}
-
-	// Delete the subvolume
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // deleteISCSIVolumeResources deletes iSCSI target and zvol.
 func deleteISCSIVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	// Find target by IQN suffix matching volume name
-	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
-	if volumeName != "" {
-		suffix := ":" + volumeName
+	deleteMatchingSuffix(sv, func() ([]idAndName, error) {
 		targets, err := client.ListISCSITargets(ctx)
-		if err == nil {
-			for i := range targets {
-				if strings.HasSuffix(targets[i].IQN, suffix) {
-					if err := client.DeleteISCSITarget(ctx, targets[i].ID); err != nil {
-						fmt.Printf("(warning: failed to delete iSCSI target %s: %v) ", targets[i].ID, err)
-					}
-					break
-				}
-			}
+		if err != nil {
+			return nil, err
+		}
+		items := make([]idAndName, len(targets))
+		for i := range targets {
+			items[i] = idAndName{id: targets[i].ID, name: targets[i].IQN}
+		}
+		return items, nil
+	}, func(id string) {
+		if err := client.DeleteISCSITarget(ctx, id); err != nil {
+			fmt.Printf("(warning: failed to delete iSCSI target %s: %v) ", id, err)
+		}
+	})
+	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
+}
+
+type idAndName struct{ id, name string }
+
+// deleteMatchingSuffix finds a resource by name suffix matching the CSI volume name, and deletes it.
+func deleteMatchingSuffix(sv *nastyapi.Subvolume, listFn func() ([]idAndName, error), deleteFn func(string)) {
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName == "" {
+		return
+	}
+	suffix := ":" + volumeName
+	items, err := listFn()
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if strings.HasSuffix(items[i].name, suffix) {
+			deleteFn(items[i].id)
+			return
 		}
 	}
-
-	// Delete the zvol
-	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
 // showCleanupPreview displays the volumes that will be deleted.
