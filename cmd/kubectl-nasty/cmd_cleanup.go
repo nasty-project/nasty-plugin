@@ -277,21 +277,63 @@ func deleteOrphanedVolume(ctx context.Context, client nastyapi.ClientInterface, 
 	}
 }
 
-// deleteNFSVolumeResources deletes NFS share and subvolume.
-func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	if sv.Path != "" {
-		if shares, err := client.ListNFSShares(ctx); err == nil {
-			for i := range shares {
-				if shares[i].Path != sv.Path {
-					continue
-				}
-				if err := client.DeleteNFSShare(ctx, shares[i].ID); err != nil {
-					fmt.Printf("(warning: failed to delete NFS share %s: %v) ", shares[i].ID, err)
-				}
-				break
-			}
+type idAndPath struct{ id, path string }
+
+// deleteMatchingPath finds a resource by path match and deletes it. Used for NFS/SMB cleanup.
+func deleteMatchingPath(svPath string, listFn func() ([]idAndPath, error), deleteFn func(string)) {
+	if svPath == "" {
+		return
+	}
+	items, err := listFn()
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if items[i].path == svPath {
+			deleteFn(items[i].id)
+			return
 		}
 	}
+}
+
+type idAndName struct{ id, name string }
+
+// deleteMatchingSuffix finds a resource by name suffix matching the CSI volume name, and deletes it.
+func deleteMatchingSuffix(sv *nastyapi.Subvolume, listFn func() ([]idAndName, error), deleteFn func(string)) {
+	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
+	if volumeName == "" {
+		return
+	}
+	suffix := ":" + volumeName
+	items, err := listFn()
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if strings.HasSuffix(items[i].name, suffix) {
+			deleteFn(items[i].id)
+			return
+		}
+	}
+}
+
+// deleteNFSVolumeResources deletes NFS share and subvolume.
+func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
+	deleteMatchingPath(sv.Path, func() ([]idAndPath, error) {
+		shares, err := client.ListNFSShares(ctx)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]idAndPath, len(shares))
+		for i := range shares {
+			items[i] = idAndPath{id: shares[i].ID, path: shares[i].Path}
+		}
+		return items, nil
+	}, func(id string) {
+		if err := client.DeleteNFSShare(ctx, id); err != nil {
+			fmt.Printf("(warning: failed to delete NFS share %s: %v) ", id, err)
+		}
+	})
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
@@ -317,19 +359,21 @@ func deleteNVMeOFVolumeResources(ctx context.Context, client nastyapi.ClientInte
 
 // deleteSMBVolumeResources deletes SMB share and subvolume.
 func deleteSMBVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
-	if sv.Path != "" {
-		if shares, err := client.ListSMBShares(ctx); err == nil {
-			for i := range shares {
-				if shares[i].Path != sv.Path {
-					continue
-				}
-				if err := client.DeleteSMBShare(ctx, shares[i].ID); err != nil {
-					fmt.Printf("(warning: failed to delete SMB share %s: %v) ", shares[i].ID, err)
-				}
-				break
-			}
+	deleteMatchingPath(sv.Path, func() ([]idAndPath, error) {
+		shares, err := client.ListSMBShares(ctx)
+		if err != nil {
+			return nil, err
 		}
-	}
+		items := make([]idAndPath, len(shares))
+		for i := range shares {
+			items[i] = idAndPath{id: shares[i].ID, path: shares[i].Path}
+		}
+		return items, nil
+	}, func(id string) {
+		if err := client.DeleteSMBShare(ctx, id); err != nil {
+			fmt.Printf("(warning: failed to delete SMB share %s: %v) ", id, err)
+		}
+	})
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
 }
 
@@ -351,27 +395,6 @@ func deleteISCSIVolumeResources(ctx context.Context, client nastyapi.ClientInter
 		}
 	})
 	return client.DeleteSubvolume(ctx, sv.Filesystem, sv.Name)
-}
-
-type idAndName struct{ id, name string }
-
-// deleteMatchingSuffix finds a resource by name suffix matching the CSI volume name, and deletes it.
-func deleteMatchingSuffix(sv *nastyapi.Subvolume, listFn func() ([]idAndName, error), deleteFn func(string)) {
-	volumeName := sv.Properties[nastyapi.PropertyCSIVolumeName]
-	if volumeName == "" {
-		return
-	}
-	suffix := ":" + volumeName
-	items, err := listFn()
-	if err != nil {
-		return
-	}
-	for i := range items {
-		if strings.HasSuffix(items[i].name, suffix) {
-			deleteFn(items[i].id)
-			return
-		}
-	}
 }
 
 // showCleanupPreview displays the volumes that will be deleted.
