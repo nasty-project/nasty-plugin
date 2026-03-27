@@ -228,7 +228,7 @@ func processSubvolume(sv *nastyapi.Subvolume, sc *summaryContext, summary *Summa
 
 	// Add used space
 	if sv.UsedBytes != nil {
-		summary.Capacity.UsedBytes += int64(*sv.UsedBytes)
+		summary.Capacity.UsedBytes += int64(*sv.UsedBytes) //nolint:gosec // G115: storage sizes won't exceed int64 max
 	}
 
 	// Check health

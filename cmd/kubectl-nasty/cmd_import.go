@@ -108,7 +108,7 @@ Examples:
 	return cmd
 }
 
-//nolint:gocyclo,gocognit // complexity from protocol switch handling is acceptable
+//nolint:gocyclo // complexity from protocol switch handling is acceptable
 func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string, skipTLSVerify *bool,
 	datasetPath, protocol, volumeID string, createShare bool, storageClass string, dryRun bool) error {
 
@@ -162,7 +162,7 @@ func runImport(ctx context.Context, url, apiKey, secretRef, outputFormat *string
 
 	// Get capacity from used space
 	if subvol.UsedBytes != nil {
-		result.CapacityBytes = int64(*subvol.UsedBytes)
+		result.CapacityBytes = int64(*subvol.UsedBytes) //nolint:gosec // G115: storage sizes won't exceed int64 max
 	}
 
 	// Build properties to set

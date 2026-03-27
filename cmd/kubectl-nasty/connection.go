@@ -161,7 +161,6 @@ type NAStyClient struct {
 // connectToNASty creates a NASty API client with the given config.
 // The client auto-connects on first API call.
 func connectToNASty(_ context.Context, cfg *connectionConfig) (*NAStyClient, error) {
-	//nolint:contextcheck // NewClient doesn't require context, connection is lazy
 	client, err := nastyapi.NewClient(cfg.URL, cfg.APIKey, cfg.SkipTLSVerify, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NASty client: %w", err)

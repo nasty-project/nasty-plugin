@@ -22,9 +22,6 @@ const (
 	outputFormatYAML  = "yaml"
 	outputFormatTable = "table"
 	valueTrue         = "true"
-
-	// datasetTypeVolume is the NASty dataset type for ZVOLs.
-	datasetTypeVolume = "VOLUME"
 )
 
 func newListCmd(url, apiKey, secretRef, outputFormat *string, skipTLSVerify *bool, clusterID *string) *cobra.Command {

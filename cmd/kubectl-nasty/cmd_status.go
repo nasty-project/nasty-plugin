@@ -127,7 +127,7 @@ func buildVolumeStatus(ctx context.Context, client nastyapi.ClientInterface, sv 
 
 	// Used bytes from subvolume
 	if sv.UsedBytes != nil {
-		status.UsedBytes = int64(*sv.UsedBytes)
+		status.UsedBytes = int64(*sv.UsedBytes) //nolint:gosec // G115: storage sizes won't exceed int64 max
 		status.UsedHuman = dashboard.FormatBytes(status.UsedBytes)
 	}
 
