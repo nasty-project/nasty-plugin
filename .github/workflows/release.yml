@@ -21,8 +21,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: nasty-project/nasty-go
-          path: ../nasty-go
+          path: nasty-go
           token: ${{ secrets.NASTY_PAT }}
+
+      - name: Fix replace directive for CI
+        run: go mod edit -replace github.com/nasty-project/nasty-go=./nasty-go
 
       - name: Set up Go
         uses: actions/setup-go@v6
