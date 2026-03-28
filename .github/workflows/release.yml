@@ -48,7 +48,6 @@ jobs:
         with:
           version: v2.11.4
           args: --config .golangci.yml
-          skip-schema-validation: true
 
       - name: Build binaries for all platforms
         run: |

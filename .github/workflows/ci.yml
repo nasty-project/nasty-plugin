@@ -37,7 +37,6 @@ jobs:
         with:
           version: v2.11.4
           args: --config .golangci.yml
-          skip-schema-validation: true
 
   test:
     name: Unit Tests

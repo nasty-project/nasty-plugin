@@ -318,7 +318,7 @@ func deleteMatchingSuffix(sv *nastyapi.Subvolume, listFn func() ([]idAndName, er
 }
 
 // deleteNFSVolumeResources deletes NFS share and subvolume.
-func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
+func deleteNFSVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error { //nolint:dupl // protocol-specific wrappers are intentionally similar
 	deleteMatchingPath(sv.Path, func() ([]idAndPath, error) {
 		shares, err := client.ListNFSShares(ctx)
 		if err != nil {
@@ -358,7 +358,7 @@ func deleteNVMeOFVolumeResources(ctx context.Context, client nastyapi.ClientInte
 }
 
 // deleteSMBVolumeResources deletes SMB share and subvolume.
-func deleteSMBVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error {
+func deleteSMBVolumeResources(ctx context.Context, client nastyapi.ClientInterface, sv *nastyapi.Subvolume) error { //nolint:dupl // protocol-specific wrappers are intentionally similar
 	deleteMatchingPath(sv.Path, func() ([]idAndPath, error) {
 		shares, err := client.ListSMBShares(ctx)
 		if err != nil {
