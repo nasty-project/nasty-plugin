@@ -114,6 +114,9 @@ linters:
     gocognit:
       min-complexity: 45
       
+    gomoddirectives:
+      replace-local: true
+
     dupl:
       threshold: 100
       
