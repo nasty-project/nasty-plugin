@@ -5,11 +5,10 @@ A `kubectl` plugin for managing [NASty CSI](https://github.com/nasty-project/nas
 ## Installation
 
 ```bash
-go build -o kubectl-nasty ./cmd/kubectl-nasty
-mv kubectl-nasty /usr/local/bin/
+kubectl krew install nasty
 ```
 
-Once in your PATH, kubectl discovers it automatically:
+Then use it as:
 
 ```bash
 kubectl nasty list
