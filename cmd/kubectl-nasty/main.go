@@ -22,7 +22,7 @@ import (
 
 // Build information (set via ldflags).
 var (
-	version = "dev"
+	version = "0.0.1"
 	commit  = "unknown"
 )
 
