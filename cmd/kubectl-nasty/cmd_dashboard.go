@@ -109,24 +109,24 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 		clusterID: *clusterID,
 	}
 
-	// Setup routes
+	// Setup routes - use /dashboard/ prefix to match shared HTML templates
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", server.handleDashboard)
-	mux.HandleFunc("/api/volumes", server.handleAPIVolumes)
-	mux.HandleFunc("/api/snapshots", server.handleAPISnapshots)
-	mux.HandleFunc("/api/clones", server.handleAPIClones)
-	mux.HandleFunc("/api/summary", server.handleAPISummary)
-	mux.HandleFunc("/partials/volumes", server.handlePartialVolumes)
-	mux.HandleFunc("/partials/snapshots", server.handlePartialSnapshots)
-	mux.HandleFunc("/partials/clones", server.handlePartialClones)
-	mux.HandleFunc("/partials/unmanaged", server.handlePartialUnmanaged)
-	mux.HandleFunc("/partials/summary", server.handlePartialSummary)
-	mux.HandleFunc("/partials/volume-detail/", server.handlePartialVolumeDetail)
-	mux.HandleFunc("/partials/metrics", server.handlePartialMetrics)
-	mux.HandleFunc("/api/unmanaged", server.handleAPIUnmanaged)
-	mux.HandleFunc("/api/volumes/", server.handleAPIVolumeDetail)
-	mux.HandleFunc("/api/metrics", server.handleAPIMetrics)
-	mux.HandleFunc("/api/metrics/raw", server.handleAPIMetricsRaw)
+	mux.HandleFunc("/dashboard/", server.handleDashboard)
+	mux.HandleFunc("/dashboard/api/volumes", server.handleAPIVolumes)
+	mux.HandleFunc("/dashboard/api/volumes/", server.handleAPIVolumeDetail)
+	mux.HandleFunc("/dashboard/api/snapshots", server.handleAPISnapshots)
+	mux.HandleFunc("/dashboard/api/clones", server.handleAPIClones)
+	mux.HandleFunc("/dashboard/api/summary", server.handleAPISummary)
+	mux.HandleFunc("/dashboard/api/unmanaged", server.handleAPIUnmanaged)
+	mux.HandleFunc("/dashboard/api/metrics", server.handleAPIMetrics)
+	mux.HandleFunc("/dashboard/api/metrics/raw", server.handleAPIMetricsRaw)
+	mux.HandleFunc("/dashboard/partials/volumes", server.handlePartialVolumes)
+	mux.HandleFunc("/dashboard/partials/snapshots", server.handlePartialSnapshots)
+	mux.HandleFunc("/dashboard/partials/clones", server.handlePartialClones)
+	mux.HandleFunc("/dashboard/partials/unmanaged", server.handlePartialUnmanaged)
+	mux.HandleFunc("/dashboard/partials/summary", server.handlePartialSummary)
+	mux.HandleFunc("/dashboard/partials/volume-detail/", server.handlePartialVolumeDetail)
+	mux.HandleFunc("/dashboard/partials/metrics", server.handlePartialMetrics)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
@@ -150,7 +150,7 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 		close(done)
 	}()
 
-	dashboardURL := fmt.Sprintf("http://localhost:%d", port)
+	dashboardURL := fmt.Sprintf("http://localhost:%d/dashboard", port)
 	fmt.Printf("NASty CSI Dashboard starting on %s\n", dashboardURL)
 	fmt.Println("Press Ctrl+C to stop")
 
