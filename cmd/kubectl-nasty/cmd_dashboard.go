@@ -209,20 +209,8 @@ func (s *dashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Render the page shell immediately — HTMX partials will load data asynchronously
 	data := DashboardData{Version: version}
-	ctx := r.Context()
-
-	client, err := s.getClient(ctx)
-	if err != nil {
-		data.Error = fmt.Sprintf("Failed to connect to NASty: %v", err)
-	} else {
-		defer client.Close()
-		data = s.fetchAllData(ctx, client)
-		data.Version = version
-	}
-
-	params := dashboard.ParsePaginationParams(r)
-	data.VolumesPage = dashboard.PaginateVolumes(data.Volumes, params, "/dashboard/partials/volumes")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "dashboard.html", data); err != nil {

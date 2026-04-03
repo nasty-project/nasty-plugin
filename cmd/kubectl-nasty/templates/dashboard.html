@@ -940,9 +940,9 @@
             if (el) el.textContent = 'Last updated: ' + ts;
         }
 
-        // Auto-refresh off by default
+        // Load data on page load, auto-refresh off by default
         setAutoRefresh(0);
-        updateTimestamp();
+        refreshAll();
 
         // --- Toast notifications ---
         function showToast(title, message) {
