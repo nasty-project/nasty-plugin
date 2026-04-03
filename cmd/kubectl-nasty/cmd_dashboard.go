@@ -523,7 +523,7 @@ func (s *dashboardServer) handlePartialVolumeDetail(w http.ResponseWriter, r *ht
 	ctx := r.Context()
 
 	// Extract volume ID from URL path: /partials/volume-detail/{id}
-	volumeID := strings.TrimPrefix(r.URL.Path, "/partials/volume-detail/")
+	volumeID := strings.TrimPrefix(r.URL.Path, "/dashboard/partials/volume-detail/")
 	if volumeID == "" {
 		http.Error(w, "Volume ID required", http.StatusBadRequest)
 		return
@@ -560,7 +560,7 @@ func (s *dashboardServer) handleAPIVolumeDetail(w http.ResponseWriter, r *http.R
 	ctx := r.Context()
 
 	// Extract volume ID from URL path: /api/volumes/{id}
-	volumeID := strings.TrimPrefix(r.URL.Path, "/api/volumes/")
+	volumeID := strings.TrimPrefix(r.URL.Path, "/dashboard/api/volumes/")
 	if volumeID == "" {
 		writeJSONError(w, errPoolNotConfigured) // Reuse error for consistency
 		return
