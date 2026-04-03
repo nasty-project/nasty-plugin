@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/fatih/color v1.18.0
 	github.com/jedib0t/go-pretty/v6 v6.7.8
-	github.com/nasty-project/nasty-go v0.0.0
+	github.com/nasty-project/nasty-go v0.0.0-20260403205242-74a80ea067b3
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.2
