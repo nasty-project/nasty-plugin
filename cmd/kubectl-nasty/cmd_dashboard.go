@@ -204,7 +204,7 @@ func (s *dashboardServer) getClient(ctx context.Context) (nastyapi.ClientInterfa
 }
 
 func (s *dashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard/" && r.URL.Path != "/dashboard" {
 		http.NotFound(w, r)
 		return
 	}
