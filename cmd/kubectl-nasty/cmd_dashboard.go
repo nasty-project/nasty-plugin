@@ -222,7 +222,7 @@ func (s *dashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request
 	}
 
 	params := dashboard.ParsePaginationParams(r)
-	data.VolumesPage = dashboard.PaginateVolumes(data.Volumes, params, "/partials/volumes")
+	data.VolumesPage = dashboard.PaginateVolumes(data.Volumes, params, "/dashboard/partials/volumes")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "dashboard.html", data); err != nil {
@@ -384,7 +384,7 @@ func (s *dashboardServer) handlePartialVolumes(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	paginated := dashboard.PaginateVolumes(volumes, params, "/partials/volumes")
+	paginated := dashboard.PaginateVolumes(volumes, params, "/dashboard/partials/volumes")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "volumes_table.html", paginated); err != nil {
@@ -410,7 +410,7 @@ func (s *dashboardServer) handlePartialSnapshots(w http.ResponseWriter, r *http.
 		return
 	}
 
-	paginated := dashboard.PaginateSnapshots(snapshots, params, "/partials/snapshots")
+	paginated := dashboard.PaginateSnapshots(snapshots, params, "/dashboard/partials/snapshots")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "snapshots_table.html", paginated); err != nil {
@@ -436,7 +436,7 @@ func (s *dashboardServer) handlePartialClones(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	paginated := dashboard.PaginateClones(clones, params, "/partials/clones")
+	paginated := dashboard.PaginateClones(clones, params, "/dashboard/partials/clones")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "clones_table.html", paginated); err != nil {
@@ -486,7 +486,7 @@ func (s *dashboardServer) handlePartialUnmanaged(w http.ResponseWriter, r *http.
 		return
 	}
 
-	paginated := dashboard.PaginateUnmanaged(unmanaged, params, "/partials/unmanaged")
+	paginated := dashboard.PaginateUnmanaged(unmanaged, params, "/dashboard/partials/unmanaged")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "unmanaged_table.html", paginated); err != nil {
