@@ -5,6 +5,9 @@ package main
 
 import "github.com/nasty-project/nasty-go/dashboard"
 
+// Subvolume type constants (matches nasty-go SubvolumeType field values).
+const subvolumeTypeBlock = "block"
+
 type (
 	VolumeInfo             = dashboard.VolumeInfo
 	SnapshotInfo           = dashboard.SnapshotInfo

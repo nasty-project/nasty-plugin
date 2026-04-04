@@ -268,7 +268,7 @@ func handleISCSIImport(ctx context.Context, client nastyapi.ClientInterface, sv 
 	props := make(map[string]string)
 
 	// iSCSI volumes are block devices
-	if sv.SubvolumeType != "block" {
+	if sv.SubvolumeType != subvolumeTypeBlock {
 		return nil, fmt.Errorf("%w: subvolume type is %s", errISCSIRequiresZvol, sv.SubvolumeType)
 	}
 

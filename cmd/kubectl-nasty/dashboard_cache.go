@@ -44,6 +44,8 @@ type cachedData struct {
 }
 
 // dashboardCache provides a single shared NASty client and a short-TTL data cache.
+//
+//nolint:govet // field alignment not critical for this struct
 type dashboardCache struct {
 	cfg       *connectionConfig
 	pool      string
@@ -391,8 +393,8 @@ func buildUnmanagedList(allSubvols, managedSubvols []nastyapi.Subvolume, nfsShar
 			vol.Protocol = dashboard.ProtocolNFS
 			vol.NFSShareID = share.ID
 			vol.NFSSharePath = share.Path
-		} else if sv.SubvolumeType == "block" {
-			vol.Protocol = "block"
+		} else if sv.SubvolumeType == subvolumeTypeBlock {
+			vol.Protocol = subvolumeTypeBlock
 		}
 		volumes = append(volumes, vol)
 	}
