@@ -940,9 +940,8 @@
             if (el) el.textContent = 'Last updated: ' + ts;
         }
 
-        // Load data on page load, auto-refresh off by default
+        // Auto-refresh off by default; initial data loaded by hx-trigger="load" on each panel
         setAutoRefresh(0);
-        refreshAll();
 
         // --- Toast notifications ---
         function showToast(title, message) {
