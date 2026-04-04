@@ -264,6 +264,7 @@ func (s *dashboardServer) handleAPISummary(w http.ResponseWriter, r *http.Reques
 	writeJSONResponse(w, data.summary)
 }
 
+//nolint:dupl // Similar structure but different data types - clearer to keep separate
 func (s *dashboardServer) handlePartialVolumes(w http.ResponseWriter, r *http.Request) {
 	params := dashboard.ParsePaginationParams(r)
 
@@ -281,6 +282,7 @@ func (s *dashboardServer) handlePartialVolumes(w http.ResponseWriter, r *http.Re
 	}
 }
 
+//nolint:dupl // Similar structure but different data types - clearer to keep separate
 func (s *dashboardServer) handlePartialSnapshots(w http.ResponseWriter, r *http.Request) {
 	params := dashboard.ParsePaginationParams(r)
 
@@ -298,6 +300,7 @@ func (s *dashboardServer) handlePartialSnapshots(w http.ResponseWriter, r *http.
 	}
 }
 
+//nolint:dupl // Similar structure but different data types - clearer to keep separate
 func (s *dashboardServer) handlePartialClones(w http.ResponseWriter, r *http.Request) {
 	params := dashboard.ParsePaginationParams(r)
 
