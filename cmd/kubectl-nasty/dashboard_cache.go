@@ -12,6 +12,8 @@ import (
 )
 
 // rpcTiming records the duration of a single RPC call.
+//
+//nolint:govet // field alignment not critical for this struct
 type rpcTiming struct {
 	Name     string        `json:"name"`
 	Duration time.Duration `json:"duration_ms"`
@@ -19,13 +21,17 @@ type rpcTiming struct {
 }
 
 // fetchTimings records all RPC call durations for a single data fetch cycle.
+//
+//nolint:govet // field alignment not critical for this struct
 type fetchTimings struct {
-	StartedAt time.Time    `json:"started_at"`
+	StartedAt time.Time     `json:"started_at"`
 	Total     time.Duration `json:"total_ms"`
-	Calls     []rpcTiming  `json:"calls"`
+	Calls     []rpcTiming   `json:"calls"`
 }
 
 // cachedData holds the fetched dashboard data along with timing info.
+//
+//nolint:govet // field alignment not critical for this struct
 type cachedData struct {
 	volumes   []VolumeInfo
 	snapshots []SnapshotInfo
@@ -153,9 +159,9 @@ func (dc *dashboardCache) fetchData(ctx context.Context) (*cachedData, error) {
 	if dc.clusterID != "" {
 		filteredSubvols = filterManagedSubvolsByCluster(managedSubvols, dc.clusterID)
 	}
-	for _, sv := range filteredSubvols {
-		if sv.Properties[nastyapi.PropertyCSIVolumeName] != "" {
-			filesystems[sv.Filesystem] = struct{}{}
+	for i := range filteredSubvols {
+		if filteredSubvols[i].Properties[nastyapi.PropertyCSIVolumeName] != "" {
+			filesystems[filteredSubvols[i].Filesystem] = struct{}{}
 		}
 	}
 
@@ -183,8 +189,8 @@ func (dc *dashboardCache) fetchData(ctx context.Context) (*cachedData, error) {
 		smbShares      []nastyapi.SMBShare
 		iscsiTargets   []nastyapi.ISCSITarget
 		wg             sync.WaitGroup
-		nfsErr, nvmeErr, smbErr, iscsiErr error
 	)
+	var nfsErr, nvmeErr, smbErr, iscsiErr error
 
 	wg.Add(4)
 	go func() {
@@ -325,11 +331,11 @@ func matchSnapshotsToVolumes(snaps []nastyapi.Snapshot, subvols []nastyapi.Subvo
 		protocol string
 	}
 	managedSubvols := make(map[string]subvolMeta)
-	for _, sv := range subvols {
-		volumeID := sv.Properties[nastyapi.PropertyCSIVolumeName]
-		protocol := sv.Properties[nastyapi.PropertyProtocol]
+	for i := range subvols {
+		volumeID := subvols[i].Properties[nastyapi.PropertyCSIVolumeName]
+		protocol := subvols[i].Properties[nastyapi.PropertyProtocol]
 		if volumeID != "" {
-			key := sv.Filesystem + "/" + sv.Name
+			key := subvols[i].Filesystem + "/" + subvols[i].Name
 			managedSubvols[key] = subvolMeta{volumeID: volumeID, protocol: protocol}
 		}
 	}
@@ -378,11 +384,11 @@ func buildUnmanagedList(allSubvols, managedSubvols []nastyapi.Subvolume, nfsShar
 			Type:    sv.SubvolumeType,
 		}
 		if sv.UsedBytes != nil {
-			vol.SizeBytes = int64(*sv.UsedBytes)
+			vol.SizeBytes = int64(*sv.UsedBytes) //nolint:gosec // storage sizes won't exceed int64 max
 			vol.Size = dashboard.FormatBytes(vol.SizeBytes)
 		}
 		if share, ok := nfsShareByPath[sv.Path]; ok {
-			vol.Protocol = "nfs"
+			vol.Protocol = dashboard.ProtocolNFS
 			vol.NFSShareID = share.ID
 			vol.NFSSharePath = share.Path
 		} else if sv.SubvolumeType == "block" {

@@ -92,9 +92,9 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 
 	// Parse templates
 	funcMap := template.FuncMap{
-		"add":        func(a, b int) int { return a + b },
-		"sub":        func(a, b int) int { return a - b },
-		"formatDur":  formatDurationMS,
+		"add":       func(a, b int) int { return a + b },
+		"sub":       func(a, b int) int { return a - b },
+		"formatDur": formatDurationMS,
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
