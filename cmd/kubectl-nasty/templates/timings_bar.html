@@ -1,0 +1,16 @@
+{{define "timings_bar.html"}}
+<div class="timing-bar">
+    <div class="timing-header">
+        <span class="timing-label">Fetch Timings</span>
+        <span class="timing-total">Total: <strong>{{formatDur .Total}}</strong></span>
+        <span class="timing-age" title="{{.StartedAt.Format "15:04:05"}}">at {{.StartedAt.Format "15:04:05"}}</span>
+    </div>
+    <div class="timing-calls">
+        {{range .Calls}}
+        <span class="timing-call {{if .Error}}timing-error{{else if gt .Duration.Milliseconds 1000}}timing-slow{{else if gt .Duration.Milliseconds 200}}timing-warn{{end}}" title="{{if .Error}}Error: {{.Error}}{{end}}">
+            {{.Name}}: <strong>{{formatDur .Duration}}</strong>
+        </span>
+        {{end}}
+    </div>
+</div>
+{{end}}

@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	nastyapi "github.com/nasty-project/nasty-go"
 	"github.com/nasty-project/nasty-go/dashboard"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
@@ -32,10 +31,9 @@ var (
 
 // dashboardServer holds the server state.
 type dashboardServer struct {
-	cfg       *connectionConfig
 	templates *template.Template
-	pool      string // ZFS pool for unmanaged volume search
-	clusterID string // Cluster ID for multi-cluster filtering
+	cache     *dashboardCache
+	pool      string // pool name for unmanaged volume search
 }
 
 func newDashboardCmd(url, apiKey, secretRef, _ *string, skipTLSVerify *bool, clusterID *string) *cobra.Command {
@@ -94,19 +92,22 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 
 	// Parse templates
 	funcMap := template.FuncMap{
-		"add": func(a, b int) int { return a + b },
-		"sub": func(a, b int) int { return a - b },
+		"add":        func(a, b int) int { return a + b },
+		"sub":        func(a, b int) int { return a - b },
+		"formatDur":  formatDurationMS,
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return fmt.Errorf("failed to parse templates: %w", err)
 	}
 
+	cache := newDashboardCache(cfg, pool, *clusterID)
+	defer cache.close()
+
 	server := &dashboardServer{
-		cfg:       cfg,
 		templates: tmpl,
+		cache:     cache,
 		pool:      pool,
-		clusterID: *clusterID,
 	}
 
 	// Setup routes - use /dashboard/ prefix to match shared HTML templates
@@ -120,6 +121,7 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 	mux.HandleFunc("/dashboard/api/unmanaged", server.handleAPIUnmanaged)
 	mux.HandleFunc("/dashboard/api/metrics", server.handleAPIMetrics)
 	mux.HandleFunc("/dashboard/api/metrics/raw", server.handleAPIMetricsRaw)
+	mux.HandleFunc("/dashboard/api/timings", server.handleAPITimings)
 	mux.HandleFunc("/dashboard/partials/volumes", server.handlePartialVolumes)
 	mux.HandleFunc("/dashboard/partials/snapshots", server.handlePartialSnapshots)
 	mux.HandleFunc("/dashboard/partials/clones", server.handlePartialClones)
@@ -127,6 +129,7 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 	mux.HandleFunc("/dashboard/partials/summary", server.handlePartialSummary)
 	mux.HandleFunc("/dashboard/partials/volume-detail/", server.handlePartialVolumeDetail)
 	mux.HandleFunc("/dashboard/partials/metrics", server.handlePartialMetrics)
+	mux.HandleFunc("/dashboard/partials/timings", server.handlePartialTimings)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
@@ -142,6 +145,7 @@ func runDashboard(ctx context.Context, url, apiKey, secretRef *string, skipTLSVe
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		klog.Info("Shutting down server...")
+		cache.close()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
@@ -199,8 +203,13 @@ func openURL(ctx context.Context, url string) error {
 	return nil
 }
 
-func (s *dashboardServer) getClient(ctx context.Context) (nastyapi.ClientInterface, error) {
-	return connectToNASty(ctx, s.cfg)
+// getCachedData is the common helper for all handlers. Returns cached data or triggers a fresh fetch.
+func (s *dashboardServer) getCachedData(ctx context.Context) (*cachedData, error) {
+	data, err := s.cache.getData(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (s *dashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -219,160 +228,52 @@ func (s *dashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *dashboardServer) fetchAllData(ctx context.Context, client nastyapi.ClientInterface) DashboardData {
-	data := DashboardData{}
-
-	// Fetch volumes
-	volumes, err := dashboard.FindManagedVolumes(ctx, client, s.clusterID)
-	if err != nil {
-		klog.Warningf("Failed to fetch volumes: %v", err)
-	} else {
-		data.Volumes = volumes
-	}
-
-	// Fetch snapshots
-	snapshots, err := dashboard.FindManagedSnapshots(ctx, client, s.clusterID)
-	if err != nil {
-		klog.Warningf("Failed to fetch snapshots: %v", err)
-	} else {
-		data.Snapshots = snapshots
-	}
-
-	// Fetch clones
-	clones, err := dashboard.FindClonedVolumes(ctx, client, s.clusterID)
-	if err != nil {
-		klog.Warningf("Failed to fetch clones: %v", err)
-	} else {
-		data.Clones = clones
-	}
-
-	// Fetch unmanaged volumes if pool is configured
-	if s.pool != "" {
-		unmanaged, unmanagedErr := dashboard.FindUnmanagedVolumes(ctx, client, s.pool, false, s.clusterID)
-		if unmanagedErr != nil {
-			klog.Warningf("Failed to fetch unmanaged volumes: %v", unmanagedErr)
-		} else {
-			data.Unmanaged = unmanaged
-		}
-	}
-
-	// Run health checks and annotate volumes
-	dashboard.AnnotateVolumesWithHealth(ctx, client, data.Volumes)
-
-	// Enrich with Kubernetes PV/PVC data (best-effort, no pods for list view)
-	k8sData := enrichWithK8sData(ctx, false)
-	if k8sData.Available {
-		for i := range data.Volumes {
-			if binding := dashboard.MatchK8sBinding(k8sData.Bindings, data.Volumes[i].Dataset, data.Volumes[i].VolumeID); binding != nil {
-				data.Volumes[i].K8s = binding
-			}
-		}
-	}
-
-	// Calculate summary
-	data.Summary = dashboard.CalculateSummary(data.Volumes, data.Snapshots, data.Clones)
-
-	return data
-}
-
 func (s *dashboardServer) handleAPIVolumes(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	client, err := s.getClient(ctx)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		writeJSONError(w, err)
 		return
 	}
-	defer client.Close()
-
-	volumes, err := dashboard.FindManagedVolumes(ctx, client, s.clusterID)
-	if err != nil {
-		writeJSONError(w, err)
-		return
-	}
-
-	writeJSONResponse(w, volumes)
+	writeJSONResponse(w, data.volumes)
 }
 
 func (s *dashboardServer) handleAPISnapshots(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	client, err := s.getClient(ctx)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		writeJSONError(w, err)
 		return
 	}
-	defer client.Close()
-
-	snapshots, err := dashboard.FindManagedSnapshots(ctx, client, s.clusterID)
-	if err != nil {
-		writeJSONError(w, err)
-		return
-	}
-
-	writeJSONResponse(w, snapshots)
+	writeJSONResponse(w, data.snapshots)
 }
 
 func (s *dashboardServer) handleAPIClones(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	client, err := s.getClient(ctx)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		writeJSONError(w, err)
 		return
 	}
-	defer client.Close()
-
-	clones, err := dashboard.FindClonedVolumes(ctx, client, s.clusterID)
-	if err != nil {
-		writeJSONError(w, err)
-		return
-	}
-
-	writeJSONResponse(w, clones)
+	writeJSONResponse(w, data.clones)
 }
 
 func (s *dashboardServer) handleAPISummary(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	client, err := s.getClient(ctx)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		writeJSONError(w, err)
 		return
 	}
-	defer client.Close()
-
-	data := s.fetchAllData(ctx, client)
-	writeJSONResponse(w, data.Summary)
+	writeJSONResponse(w, data.summary)
 }
 
 func (s *dashboardServer) handlePartialVolumes(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	params := dashboard.ParsePaginationParams(r)
 
-	client, err := s.getClient(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	volumes, err := dashboard.FindManagedVolumes(ctx, client, s.clusterID)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Annotate with health status
-	dashboard.AnnotateVolumesWithHealth(ctx, client, volumes)
-
-	// Enrich with Kubernetes PV/PVC data (best-effort, no pods for table view)
-	k8sData := enrichWithK8sData(ctx, false)
-	if k8sData.Available {
-		for i := range volumes {
-			if binding := dashboard.MatchK8sBinding(k8sData.Bindings, volumes[i].Dataset, volumes[i].VolumeID); binding != nil {
-				volumes[i].K8s = binding
-			}
-		}
-	}
-
-	paginated := dashboard.PaginateVolumes(volumes, params, "/dashboard/partials/volumes")
+	paginated := dashboard.PaginateVolumes(data.volumes, params, "/dashboard/partials/volumes")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "volumes_table.html", paginated); err != nil {
@@ -380,25 +281,16 @@ func (s *dashboardServer) handlePartialVolumes(w http.ResponseWriter, r *http.Re
 	}
 }
 
-//nolint:dupl // Similar structure but different data types - clearer to keep separate
 func (s *dashboardServer) handlePartialSnapshots(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	params := dashboard.ParsePaginationParams(r)
 
-	client, err := s.getClient(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	snapshots, err := dashboard.FindManagedSnapshots(ctx, client, s.clusterID)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	paginated := dashboard.PaginateSnapshots(snapshots, params, "/dashboard/partials/snapshots")
+	paginated := dashboard.PaginateSnapshots(data.snapshots, params, "/dashboard/partials/snapshots")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "snapshots_table.html", paginated); err != nil {
@@ -406,25 +298,16 @@ func (s *dashboardServer) handlePartialSnapshots(w http.ResponseWriter, r *http.
 	}
 }
 
-//nolint:dupl // Similar structure but different data types - clearer to keep separate
 func (s *dashboardServer) handlePartialClones(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	params := dashboard.ParsePaginationParams(r)
 
-	client, err := s.getClient(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	clones, err := dashboard.FindClonedVolumes(ctx, client, s.clusterID)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	paginated := dashboard.PaginateClones(clones, params, "/dashboard/partials/clones")
+	paginated := dashboard.PaginateClones(data.clones, params, "/dashboard/partials/clones")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "clones_table.html", paginated); err != nil {
@@ -433,24 +316,19 @@ func (s *dashboardServer) handlePartialClones(w http.ResponseWriter, r *http.Req
 }
 
 func (s *dashboardServer) handlePartialSummary(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	client, err := s.getClient(ctx)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer client.Close()
-
-	data := s.fetchAllData(ctx, client)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.templates.ExecuteTemplate(w, "summary_cards.html", data.Summary); err != nil {
+	if err := s.templates.ExecuteTemplate(w, "summary_cards.html", data.summary); err != nil {
 		klog.Errorf("Template error: %v", err)
 	}
 }
 
 func (s *dashboardServer) handlePartialUnmanaged(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	params := dashboard.ParsePaginationParams(r)
 
 	// Check if pool is configured
@@ -461,20 +339,13 @@ func (s *dashboardServer) handlePartialUnmanaged(w http.ResponseWriter, r *http.
 		return
 	}
 
-	client, err := s.getClient(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	unmanaged, err := dashboard.FindUnmanagedVolumes(ctx, client, s.pool, false, s.clusterID)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	paginated := dashboard.PaginateUnmanaged(unmanaged, params, "/dashboard/partials/unmanaged")
+	paginated := dashboard.PaginateUnmanaged(data.unmanaged, params, "/dashboard/partials/unmanaged")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "unmanaged_table.html", paginated); err != nil {
@@ -483,28 +354,18 @@ func (s *dashboardServer) handlePartialUnmanaged(w http.ResponseWriter, r *http.
 }
 
 func (s *dashboardServer) handleAPIUnmanaged(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	// Check if pool is configured
 	if s.pool == "" {
 		writeJSONError(w, errPoolNotConfigured)
 		return
 	}
 
-	client, err := s.getClient(ctx)
-	if err != nil {
-		writeJSONError(w, err)
-		return
-	}
-	defer client.Close()
-
-	unmanaged, err := dashboard.FindUnmanagedVolumes(ctx, client, s.pool, false, s.clusterID)
+	data, err := s.getCachedData(r.Context())
 	if err != nil {
 		writeJSONError(w, err)
 		return
 	}
 
-	writeJSONResponse(w, unmanaged)
+	writeJSONResponse(w, data.unmanaged)
 }
 
 func (s *dashboardServer) handlePartialVolumeDetail(w http.ResponseWriter, r *http.Request) {
@@ -517,21 +378,25 @@ func (s *dashboardServer) handlePartialVolumeDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	client, err := s.getClient(ctx)
+	// Volume detail needs a direct API call (not cached) since it fetches share details
+	detailCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	client, err := s.cache.getClient(detailCtx)
 	if err != nil {
+		s.cache.resetClient()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer client.Close()
 
-	details, err := dashboard.GetVolumeDetails(ctx, client, volumeID)
+	details, err := dashboard.GetVolumeDetails(detailCtx, client, volumeID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Enrich with Kubernetes PV/PVC/Pod data (best-effort, include pods for detail view)
-	k8sData := enrichWithK8sData(ctx, true)
+	k8sData := enrichWithK8sData(detailCtx, true)
 	if k8sData.Available {
 		if binding := dashboard.MatchK8sBinding(k8sData.Bindings, details.Dataset, details.VolumeID); binding != nil {
 			details.K8s = binding
@@ -550,18 +415,21 @@ func (s *dashboardServer) handleAPIVolumeDetail(w http.ResponseWriter, r *http.R
 	// Extract volume ID from URL path: /api/volumes/{id}
 	volumeID := strings.TrimPrefix(r.URL.Path, "/dashboard/api/volumes/")
 	if volumeID == "" {
-		writeJSONError(w, errPoolNotConfigured) // Reuse error for consistency
+		writeJSONError(w, errPoolNotConfigured)
 		return
 	}
 
-	client, err := s.getClient(ctx)
+	detailCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	client, err := s.cache.getClient(detailCtx)
 	if err != nil {
+		s.cache.resetClient()
 		writeJSONError(w, err)
 		return
 	}
-	defer client.Close()
 
-	details, err := dashboard.GetVolumeDetails(ctx, client, volumeID)
+	details, err := dashboard.GetVolumeDetails(detailCtx, client, volumeID)
 	if err != nil {
 		writeJSONError(w, err)
 		return
@@ -571,9 +439,10 @@ func (s *dashboardServer) handleAPIVolumeDetail(w http.ResponseWriter, r *http.R
 }
 
 func (s *dashboardServer) handlePartialMetrics(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	metricsCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	metrics, err := fetchControllerMetrics(ctx)
+	metrics, err := fetchControllerMetrics(metricsCtx)
 	if err != nil {
 		metrics = &MetricsSummary{Error: err.Error()}
 	}
@@ -585,22 +454,23 @@ func (s *dashboardServer) handlePartialMetrics(w http.ResponseWriter, r *http.Re
 }
 
 func (s *dashboardServer) handleAPIMetrics(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	metricsCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	metrics, err := fetchControllerMetrics(ctx)
+	metrics, err := fetchControllerMetrics(metricsCtx)
 	if err != nil {
 		metrics = &MetricsSummary{Error: err.Error()}
 	}
-	// Don't include raw metrics in JSON response to keep it small
 	metrics.RawMetrics = ""
 
 	writeJSONResponse(w, metrics)
 }
 
 func (s *dashboardServer) handleAPIMetricsRaw(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	metricsCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	rawMetrics, err := fetchRawMetrics(ctx)
+	rawMetrics, err := fetchRawMetrics(metricsCtx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -609,6 +479,37 @@ func (s *dashboardServer) handleAPIMetricsRaw(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	//nolint:errcheck,gosec // Best effort response
 	w.Write([]byte(rawMetrics))
+}
+
+// handleAPITimings returns the last fetch timings as JSON.
+func (s *dashboardServer) handleAPITimings(w http.ResponseWriter, _ *http.Request) {
+	s.cache.mu.RLock()
+	data := s.cache.data
+	s.cache.mu.RUnlock()
+
+	if data == nil || data.timings == nil {
+		writeJSONResponse(w, map[string]string{"status": "no data yet"})
+		return
+	}
+
+	writeJSONResponse(w, data.timings)
+}
+
+// handlePartialTimings renders the timing debug bar HTML.
+func (s *dashboardServer) handlePartialTimings(w http.ResponseWriter, _ *http.Request) {
+	s.cache.mu.RLock()
+	data := s.cache.data
+	s.cache.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if data == nil || data.timings == nil {
+		//nolint:errcheck,gosec // Best effort response
+		w.Write([]byte(`<div class="timing-bar"><span class="timing-loading">Fetching data from NASty...</span></div>`))
+		return
+	}
+	if err := s.templates.ExecuteTemplate(w, "timings_bar.html", data.timings); err != nil {
+		klog.Errorf("Template error: %v", err)
+	}
 }
 
 func writeJSONResponse(w http.ResponseWriter, data any) {
@@ -623,4 +524,16 @@ func writeJSONError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	//nolint:errcheck,errchkjson,gosec // Best effort error response
 	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+}
+
+// formatDurationMS formats a time.Duration as milliseconds for template use.
+func formatDurationMS(d time.Duration) string {
+	ms := d.Milliseconds()
+	if ms < 1 {
+		return "<1ms"
+	}
+	if ms >= 1000 {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	return fmt.Sprintf("%dms", ms)
 }

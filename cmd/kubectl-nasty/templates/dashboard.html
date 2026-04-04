@@ -37,6 +37,7 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
+            padding-bottom: 50px;
         }
 
         header {
@@ -539,6 +540,73 @@
             margin-bottom: 16px;
         }
 
+        /* Debug: Timing bar */
+        .timing-bar-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .timing-bar {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 6px 20px;
+            font-size: 0.75rem;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+        }
+
+        .timing-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 6px;
+        }
+
+        .timing-label {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.65rem;
+        }
+
+        .timing-total {
+            color: var(--text-primary);
+        }
+
+        .timing-age {
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        .timing-calls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+        }
+
+        .timing-call {
+            color: var(--accent-green);
+        }
+
+        .timing-call.timing-warn {
+            color: var(--accent-yellow);
+        }
+
+        .timing-call.timing-slow {
+            color: var(--accent-red);
+        }
+
+        .timing-call.timing-error {
+            color: var(--accent-red);
+            text-decoration: line-through;
+        }
+
+        .timing-loading {
+            color: var(--text-secondary);
+        }
+
         .status-loading {
             color: var(--text-secondary);
             font-size: 0.875rem;
@@ -720,6 +788,7 @@
             </div>
         </div>
 
+
         <div class="tabs">
             <button class="tab active" onclick="showPanel('volumes', this)">
                 Volumes (<span id="tab-count-volumes">{{.VolumesPage.TotalItems}}</span>)
@@ -823,6 +892,13 @@
 
     </div>
 
+    <!-- Debug: RPC Timing Bar -->
+    <div id="timing-bar" class="timing-bar-container"
+         hx-get="/dashboard/partials/timings"
+         hx-trigger="load delay:1s"
+         hx-swap="innerHTML">
+    </div>
+
     <!-- Detail panel overlay -->
     <div class="detail-overlay" id="detail-overlay" onclick="closeDetailPanel()"></div>
 
@@ -921,7 +997,8 @@
                 htmx.ajax('GET', '/dashboard/partials/clones', { target: '#clones-table', swap: 'innerHTML' }),
                 htmx.ajax('GET', '/dashboard/partials/unmanaged', { target: '#unmanaged-table', swap: 'innerHTML' }),
                 htmx.ajax('GET', '/dashboard/partials/summary', { target: '#summary-cards', swap: 'innerHTML' }),
-                htmx.ajax('GET', '/dashboard/partials/metrics', { target: '#controller-status', swap: 'innerHTML' })
+                htmx.ajax('GET', '/dashboard/partials/metrics', { target: '#controller-status', swap: 'innerHTML' }),
+                htmx.ajax('GET', '/dashboard/partials/timings', { target: '#timing-bar', swap: 'innerHTML' })
             ];
 
             Promise.all(promises)
