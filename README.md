@@ -6,6 +6,65 @@ A `kubectl` plugin for managing [NASty CSI](https://github.com/nasty-project/nas
 
 <img width="1716" height="938" alt="image" src="https://github.com/user-attachments/assets/2076333e-5ea0-4733-9e28-7512464d56f6" />
 
+## Examples
+
+```
+❯ kubectl nasty connectivity
+Testing NASty connectivity...
+
+... Checking configuration...
+✓ Configuration: OK
+  URL: wss://10.10.20.100/ws
+  API Key: [configured, 43 chars]
+
+... Connecting to NASty...
+✓ Connection: OK (0.02s)
+
+... Verifying API access...
+  (No default filesystem, checking access...)
+✓ API access: OK (0.09s)
+
+... Counting managed volumes...
+  Managed volumes: 12
+    NFS: 1
+    NVMe-oF: 4
+    iSCSI: 7
+✓ Volume count: OK
+
+All checks passed!
+
+❯ kubectl nasty list
+ DATASET                                        │ VOLUME_ID                                │ PROTOCOL │ CAPACITY │ PVC                        │ NAMESPACE  │ TYPE       │ CLONE_SOURCE │ ADOPTABLE
+────────────────────────────────────────────────┼──────────────────────────────────────────┼──────────┼──────────┼────────────────────────────┼────────────┼────────────┼──────────────┼───────────
+ first/pvc-abfea051-e0dc-4e79-b197-d23c14db1742 │ pvc-abfea051-e0dc-4e79-b197-d23c14db1742 │ iSCSI    │ 50.0Gi   │ ollama                     │ selfhosted │ block      │              │
+ first/pvc-a239f9ad-d435-4c0b-96b5-cd81c86205ec │ pvc-a239f9ad-d435-4c0b-96b5-cd81c86205ec │ NVMe-oF  │ 1.0Gi    │ netbox-media               │ net        │ block      │              │
+ first/pvc-a6f7e628-4e1d-4e7f-82f1-4daa5b556b78 │ pvc-a6f7e628-4e1d-4e7f-82f1-4daa5b556b78 │ iSCSI    │ 50.0Gi   │ postgres-2                 │ db         │ block      │              │
+ first/pvc-633101d2-6745-4bdb-9200-80bcb058942c │ pvc-633101d2-6745-4bdb-9200-80bcb058942c │ iSCSI    │ 5.0Gi    │ ollama-ui                  │ selfhosted │ block      │              │
+ first/pvc-d505695a-cd12-4f3c-b47f-d694421fb545 │ pvc-d505695a-cd12-4f3c-b47f-d694421fb545 │ NFS      │ 1000.0Gi │ media                      │ media      │ filesystem │              │ true
+ first/pvc-d691fdf5-67e5-49b9-a486-099572d11ae3 │ pvc-d691fdf5-67e5-49b9-a486-099572d11ae3 │ iSCSI    │ 50.0Gi   │ postgres-3                 │ db         │ block      │              │
+ first/pvc-350497d7-37bd-4fe1-8325-5e9b8581c7bd │ pvc-350497d7-37bd-4fe1-8325-5e9b8581c7bd │ NVMe-oF  │ 20.0Gi   │ vmsingle-vm                │ o11y       │ block      │              │
+ first/pvc-0dac8efa-1397-44a3-9e7e-61f06c594fc4 │ pvc-0dac8efa-1397-44a3-9e7e-61f06c594fc4 │ NVMe-oF  │ 100.0Gi  │ server-volume-vl-server-0  │ o11y       │ block      │              │
+ first/pvc-3df37361-bdf9-420f-b8cb-4328e4151db7 │ pvc-3df37361-bdf9-420f-b8cb-4328e4151db7 │ iSCSI    │ 5.0Gi    │ config-qbittorrent-0       │ media      │ block      │              │
+ first/pvc-dfcc1361-6ba4-42c0-91f4-64d459d97409 │ pvc-dfcc1361-6ba4-42c0-91f4-64d459d97409 │ iSCSI    │ 50.0Gi   │ postgres-1                 │ db         │ block      │              │
+ first/pvc-6af6131d-1145-4c87-b83e-e720c0702450 │ pvc-6af6131d-1145-4c87-b83e-e720c0702450 │ iSCSI    │ 50.0Gi   │ vllm                       │ selfhosted │ block      │              │
+ first/pvc-57715c1b-ad46-4ded-81f5-d682388d9ddc │ pvc-57715c1b-ad46-4ded-81f5-d682388d9ddc │ NVMe-oF  │ 2.0Gi    │ dragonfly-data-dragonfly-0 │ db         │ block      │              │
+
+❯ kubectl nasty summary
+=== NASty CSI Summary ===
+
+Volumes
+  Total: 12    NFS: 1     NVMe-oF: 4     iSCSI: 7
+
+Snapshots
+  Total: 0      Attached: 0      Detached: 0
+
+Capacity
+  Provisioned: 1.4Ti      Used: 466.4Gi    (33.7%)
+
+Health
+  ✓ Healthy: 12
+ 󱃾 o-homelab/db  ~ ❯
+```
 
 ## Installation
 
