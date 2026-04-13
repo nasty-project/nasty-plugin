@@ -2,7 +2,7 @@
 
 A `kubectl` plugin for managing [NASty CSI](https://github.com/nasty-project/nasty-csi) volumes. Provides visibility into volumes, snapshots, clones, and health — directly from the command line.
 
-## Screenshot
+## Dashboard
 
 <img width="1716" height="938" alt="image" src="https://github.com/user-attachments/assets/2076333e-5ea0-4733-9e28-7512464d56f6" />
 
