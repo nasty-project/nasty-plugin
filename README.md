@@ -63,7 +63,7 @@ Capacity
 
 Health
   ✓ Healthy: 12
- 󱃾 o-homelab/db  ~ ❯
+❯
 ```
 
 ## Installation
@@ -99,24 +99,6 @@ kubectl nasty list
 | `troubleshoot <pvc>` | Diagnose issues with a PVC |
 | `dashboard` | Start a local web dashboard for volume overview |
 
-## Examples
-
-```bash
-# List all volumes with protocol, size, and PVC binding
-kubectl nasty list
-
-# Check if NASty is reachable from the cluster
-kubectl nasty connectivity
-
-# Find volumes left behind after PVC deletion
-kubectl nasty list-orphaned
-
-# Diagnose why a PVC isn't binding
-kubectl nasty troubleshoot my-stuck-pvc
-
-# Adopt an orphaned volume into a new cluster
-kubectl nasty adopt storage/pvc-12345 --protocol nfs --server 10.0.0.1
-```
 
 ## Related
 
