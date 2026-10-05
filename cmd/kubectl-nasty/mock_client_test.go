@@ -13,6 +13,8 @@ var _ nastyapi.ClientInterface = (*mockClient)(nil)
 // mockClient is a function-injection mock implementing nastyapi.ClientInterface.
 // Each method has an optional func field; if nil, returns a default error.
 type mockClient struct {
+	IsConnectedFunc func() bool
+
 	// Filesystem operations
 	QueryFilesystemFunc func(ctx context.Context, fsName string) (*nastyapi.Filesystem, error)
 
@@ -64,6 +66,13 @@ type mockClient struct {
 
 // errNotImplemented is the default error returned when a mock function is not set.
 var errNotImplemented = errors.New("not implemented in mock")
+
+func (m *mockClient) IsConnected() bool {
+	if m.IsConnectedFunc != nil {
+		return m.IsConnectedFunc()
+	}
+	return false
+}
 
 // Filesystem operations.
 
