@@ -21,8 +21,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: nasty-project/nasty-go
+          ref: 29fb4acdf10d8783c2beea61cffb5180e4b5749f # Match go.mod
           path: nasty-go
-          token: ${{ secrets.NASTY_PAT }}
+          persist-credentials: false
 
       - name: Fix replace directive for CI
         run: go mod edit -replace github.com/nasty-project/nasty-go=./nasty-go
@@ -48,8 +49,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: nasty-project/nasty-go
+          ref: 29fb4acdf10d8783c2beea61cffb5180e4b5749f # Match go.mod
           path: nasty-go
-          token: ${{ secrets.NASTY_PAT }}
+          persist-credentials: false
 
       - name: Fix replace directive for CI
         run: go mod edit -replace github.com/nasty-project/nasty-go=./nasty-go
