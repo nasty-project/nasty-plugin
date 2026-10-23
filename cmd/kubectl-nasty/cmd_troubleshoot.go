@@ -24,6 +24,12 @@ const (
 	statusWarning = "Warning"
 	statusError   = "Error"
 	statusSkipped = "Skipped"
+
+	checkNASConnection = "NASty Connection"
+	checkNFSShare      = "NFS Share"
+	checkNVMeOF        = "NVMe-oF Subsystem"
+	checkSMBShare      = "SMB Share"
+	checkISCSITarget   = "iSCSI Target"
 )
 
 // TroubleshootResult contains the results of troubleshooting a PVC.
@@ -184,7 +190,7 @@ func runTroubleshoot(ctx context.Context, pvcName, namespace string, url, apiKey
 	cfg, err := getConnectionConfig(ctx, url, apiKey, secretRef, skipTLSVerify)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NASty Connection",
+			Name:    checkNASConnection,
 			Status:  statusError,
 			Message: "Cannot connect to NASty: " + err.Error(),
 		})
@@ -197,7 +203,7 @@ func runTroubleshoot(ctx context.Context, pvcName, namespace string, url, apiKey
 	client, err := connectToNASty(ctx, cfg)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NASty Connection",
+			Name:    checkNASConnection,
 			Status:  statusError,
 			Message: "Cannot connect to NASty: " + err.Error(),
 		})
@@ -209,7 +215,7 @@ func runTroubleshoot(ctx context.Context, pvcName, namespace string, url, apiKey
 	defer client.Close()
 
 	result.Checks = append(result.Checks, TroubleshootCheck{
-		Name:    "NASty Connection",
+		Name:    checkNASConnection,
 		Status:  statusOK,
 		Message: "Connected to NASty",
 	})
@@ -341,7 +347,7 @@ func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 	shares, err := client.ListNFSShares(ctx)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NFS Share",
+			Name:    checkNFSShare,
 			Status:  statusError,
 			Message: "Failed to list NFS shares: " + err.Error(),
 		})
@@ -358,7 +364,7 @@ func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 	if found == nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NFS Share",
+			Name:    checkNFSShare,
 			Status:  statusError,
 			Message: "NFS share not found for path " + sharePath,
 		})
@@ -368,7 +374,7 @@ func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 	if !found.Enabled {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NFS Share",
+			Name:    checkNFSShare,
 			Status:  statusError,
 			Message: "NFS share exists but is disabled",
 		})
@@ -377,7 +383,7 @@ func checkNFSResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 	}
 
 	result.Checks = append(result.Checks, TroubleshootCheck{
-		Name:    "NFS Share",
+		Name:    checkNFSShare,
 		Status:  statusOK,
 		Message: fmt.Sprintf("NFS share found and enabled (ID: %s)", found.ID),
 	})
@@ -392,7 +398,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 
 	if volumeName == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NVMe-oF Subsystem",
+			Name:    checkNVMeOF,
 			Status:  statusWarning,
 			Message: "No CSI volume name found in properties",
 		})
@@ -404,7 +410,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 	subsystems, err := client.ListNVMeOFSubsystems(ctx)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NVMe-oF Subsystem",
+			Name:    checkNVMeOF,
 			Status:  statusError,
 			Message: "Failed to list NVMe-oF subsystems: " + err.Error(),
 		})
@@ -421,7 +427,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 
 	if subsystem == nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NVMe-oF Subsystem",
+			Name:    checkNVMeOF,
 			Status:  statusError,
 			Message: "NVMe-oF subsystem not found for volume " + volumeName,
 		})
@@ -431,7 +437,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 
 	if !subsystem.Enabled {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "NVMe-oF Subsystem",
+			Name:    checkNVMeOF,
 			Status:  statusError,
 			Message: "NVMe-oF subsystem exists but is disabled",
 		})
@@ -440,7 +446,7 @@ func checkNVMeOFResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cl
 	}
 
 	result.Checks = append(result.Checks, TroubleshootCheck{
-		Name:    "NVMe-oF Subsystem",
+		Name:    checkNVMeOF,
 		Status:  statusOK,
 		Message: fmt.Sprintf("NVMe-oF subsystem found and enabled (ID: %s, NQN: %s)", subsystem.ID, subsystem.NQN),
 	})
@@ -452,7 +458,7 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 	sharePath := sv.Path
 	if sharePath == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "SMB Share",
+			Name:    checkSMBShare,
 			Status:  statusWarning,
 			Message: "No share path found in volume properties",
 		})
@@ -462,7 +468,7 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 	shares, err := client.ListSMBShares(ctx)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "SMB Share",
+			Name:    checkSMBShare,
 			Status:  statusError,
 			Message: "Failed to list SMB shares: " + err.Error(),
 		})
@@ -479,7 +485,7 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 	if found == nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "SMB Share",
+			Name:    checkSMBShare,
 			Status:  statusError,
 			Message: "SMB share not found for path " + sharePath,
 		})
@@ -489,7 +495,7 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 
 	if !found.Enabled {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "SMB Share",
+			Name:    checkSMBShare,
 			Status:  statusError,
 			Message: "SMB share exists but is disabled",
 		})
@@ -498,7 +504,7 @@ func checkSMBResourcesForTroubleshoot(ctx context.Context, client nastyapi.Clien
 	}
 
 	result.Checks = append(result.Checks, TroubleshootCheck{
-		Name:    "SMB Share",
+		Name:    checkSMBShare,
 		Status:  statusOK,
 		Message: fmt.Sprintf("SMB share found and enabled (ID: %s, Name: %s)", found.ID, found.Name),
 	})
@@ -513,7 +519,7 @@ func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cli
 
 	if volumeName == "" {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "iSCSI Target",
+			Name:    checkISCSITarget,
 			Status:  statusWarning,
 			Message: "No CSI volume name found in properties",
 		})
@@ -525,7 +531,7 @@ func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cli
 	targets, err := client.ListISCSITargets(ctx)
 	if err != nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "iSCSI Target",
+			Name:    checkISCSITarget,
 			Status:  statusError,
 			Message: "Failed to list iSCSI targets: " + err.Error(),
 		})
@@ -542,7 +548,7 @@ func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cli
 
 	if target == nil {
 		result.Checks = append(result.Checks, TroubleshootCheck{
-			Name:    "iSCSI Target",
+			Name:    checkISCSITarget,
 			Status:  statusError,
 			Message: "iSCSI target not found for volume " + volumeName,
 		})
@@ -551,7 +557,7 @@ func checkISCSIResourcesForTroubleshoot(ctx context.Context, client nastyapi.Cli
 	}
 
 	result.Checks = append(result.Checks, TroubleshootCheck{
-		Name:    "iSCSI Target",
+		Name:    checkISCSITarget,
 		Status:  statusOK,
 		Message: fmt.Sprintf("iSCSI target found (ID: %s, IQN: %s)", target.ID, target.IQN),
 	})

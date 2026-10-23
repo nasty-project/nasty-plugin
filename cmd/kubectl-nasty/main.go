@@ -43,7 +43,7 @@ func newRootCmd() *cobra.Command {
 	)
 
 	rootCmd := &cobra.Command{
-		Use:   "kubectl-nasty",
+		Use:   pluginName,
 		Short: "Manage NASty CSI volumes",
 		Long: `kubectl-nasty is a kubectl plugin for managing NASty CSI driver volumes.
 
