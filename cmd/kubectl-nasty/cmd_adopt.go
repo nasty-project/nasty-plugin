@@ -373,7 +373,7 @@ func generatePV(info *adoptionVolumeInfo, server string) map[string]interface{} 
 			"volumeAttributes": volumeAttributes,
 		},
 		"claimRef": map[string]interface{}{
-			"name":      info.pvcName,
+			fieldName:   info.pvcName,
 			"namespace": info.namespace,
 		},
 	}
@@ -386,9 +386,9 @@ func generatePV(info *adoptionVolumeInfo, server string) map[string]interface{} 
 		"apiVersion": "v1",
 		"kind":       "PersistentVolume",
 		"metadata": map[string]interface{}{
-			"name": pvName,
+			fieldName: pvName,
 			"labels": map[string]string{
-				"app.kubernetes.io/managed-by": "kubectl-nasty",
+				"app.kubernetes.io/managed-by": pluginName,
 				"nasty-csi.io/adopted":         "true",
 			},
 			"annotations": map[string]string{
@@ -420,10 +420,10 @@ func generatePVC(info *adoptionVolumeInfo) map[string]interface{} {
 		"apiVersion": "v1",
 		"kind":       "PersistentVolumeClaim",
 		"metadata": map[string]interface{}{
-			"name":      info.pvcName,
+			fieldName:   info.pvcName,
 			"namespace": info.namespace,
 			"labels": map[string]string{
-				"app.kubernetes.io/managed-by": "kubectl-nasty",
+				"app.kubernetes.io/managed-by": pluginName,
 				"nasty-csi.io/adopted":         "true",
 			},
 			"annotations": map[string]string{
